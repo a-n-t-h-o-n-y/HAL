@@ -1,0 +1,6 @@
+Checks: 'bugprone-*, cert-*, cppcoreguidelines-*, clang-analyzer-*, hicpp-*,
+    misc-*, modernize-*, performance-*, portability-*, readability-*,
+    -readability-braces-around-statements, -hicpp-braces-around-statements,
+    -readability-uppercase-literal-suffix, -hicpp-uppercase-literal-suffix,
+    -cppcoreguidelines-non-private-member-variables-in-classes,
+    -misc-non-private-member-variables-in-classes'
