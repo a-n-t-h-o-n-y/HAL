@@ -1,25 +1,54 @@
+#include <sstream>
+
 #include <catch2/catch.hpp>
 
 #include <halg.hpp>
 
-template <typename... Args>
-auto foo(Args&&... args)
-{
-    return halg::for_each([](auto i) { REQUIRE(i == i); },
-                          std::forward<Args>(args)...);
-}
-
 TEST_CASE("for_each", "[HALG]")
 {
-    auto glob        = 0;
-    auto add_to_glob = halg::for_each([&glob](auto const& i) { glob += i; });
+    SECTION("unbound")
+    {
+        auto ss = std::stringstream{};
 
-    add_to_glob(1, 45, 2, 'a');
-    add_to_glob(5, -7);
-    REQUIRE(glob == (0 + 1 + 45 + 2 + 'a' + 5 - 7));
+        halg::for_each([&ss](auto const& x) { ss << x; }, 2, 6.3, ' ',
+                       "hello, world!", -432, 0.5);
 
-    halg::for_each([&glob](auto const& i) { glob -= i; }, 1, 45, 2, 'a', 5, -7);
-    REQUIRE(glob == 0);
+        REQUIRE(ss.str() == "26.3 hello, world!-4320.5");
+    }
 
-    foo(3.2, "help", 23, -6, 4.f);
+    SECTION("bound")
+    {
+        auto ss          = std::stringstream{};
+        auto write_to_ss = halg::for_each([&ss](auto const& x) { ss << x; });
+
+        write_to_ss(2, 6.3, ' ', "hello, world!", -432);
+        write_to_ss(0.5);
+        write_to_ss();
+        REQUIRE(ss.str() == "26.3 hello, world!-4320.5");
+    }
+}
+
+TEST_CASE("Reversed for_each", "[HALG]")
+{
+    SECTION("unbound")
+    {
+        auto ss = std::stringstream{};
+
+        halg::reverse::for_each([&ss](auto const& x) { ss << x; }, 2, 6.3, ' ',
+                                "hello, world!", -432, 0.5);
+
+        REQUIRE(ss.str() == "0.5-432hello, world! 6.32");
+    }
+
+    SECTION("bound")
+    {
+        auto ss = std::stringstream{};
+        auto write_to_ss_in_rev =
+            halg::reverse::for_each([&ss](auto const& x) { ss << x; });
+
+        write_to_ss_in_rev(2, 6.3, ' ', "hello, world!", -432);
+        write_to_ss_in_rev(0.5);
+        write_to_ss_in_rev();
+        REQUIRE(ss.str() == "-432hello, world! 6.320.5");
+    }
 }
