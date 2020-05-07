@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.14)
 
 add_executable(tests
-    tests.cpp
+    for_each.test.cpp
+    all_any_none_of.test.cpp
 )
 
 target_link_libraries(tests

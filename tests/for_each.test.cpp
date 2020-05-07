@@ -13,7 +13,7 @@ TEST_CASE("for_each", "[HALG]")
         halg::for_each([&ss](auto const& x) { ss << x; }, 2, 6.3, ' ',
                        "hello, world!", -432, 0.5);
 
-        REQUIRE(ss.str() == "26.3 hello, world!-4320.5");
+        CHECK(ss.str() == "26.3 hello, world!-4320.5");
     }
 
     SECTION("bound")
@@ -24,7 +24,7 @@ TEST_CASE("for_each", "[HALG]")
         write_to_ss(2, 6.3, ' ', "hello, world!", -432);
         write_to_ss(0.5);
         write_to_ss();
-        REQUIRE(ss.str() == "26.3 hello, world!-4320.5");
+        CHECK(ss.str() == "26.3 hello, world!-4320.5");
     }
 }
 
@@ -37,7 +37,7 @@ TEST_CASE("Reversed for_each", "[HALG]")
         halg::reverse::for_each([&ss](auto const& x) { ss << x; }, 2, 6.3, ' ',
                                 "hello, world!", -432, 0.5);
 
-        REQUIRE(ss.str() == "0.5-432hello, world! 6.32");
+        CHECK(ss.str() == "0.5-432hello, world! 6.32");
     }
 
     SECTION("bound")
@@ -49,6 +49,6 @@ TEST_CASE("Reversed for_each", "[HALG]")
         write_to_ss_in_rev(2, 6.3, ' ', "hello, world!", -432);
         write_to_ss_in_rev(0.5);
         write_to_ss_in_rev();
-        REQUIRE(ss.str() == "-432hello, world! 6.320.5");
+        CHECK(ss.str() == "-432hello, world! 6.320.5");
     }
 }

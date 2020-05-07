@@ -12,6 +12,7 @@ parameters, similar to how STL algorithms work over containers.
   bound.
 - All algorithms are in the `halg` namespace, versions that work on elements in
   reverse order are in the `halg::reverse` namespace.
+- Empty parameter packs cannot be used, will only return a callable object.
 
 ```cpp
 - auto for_each(UnaryFunction, Elements...) -> void;
@@ -25,7 +26,6 @@ parameters, similar to how STL algorithms work over containers.
 
 - auto none_of(UnaryPredicate, Elements...) -> bool;
     Return true if none of UnaryPredicate(Elements...) are true.
-
 ```
 
 ## Examples
