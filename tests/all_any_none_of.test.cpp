@@ -66,6 +66,33 @@ TEST_CASE("all_of", "[HALG]")
         CHECK(all_are_even_rev(2, 4, 12, false, 2));
         CHECK(all_are_even_rev(2));
     }
+
+    SECTION("identity default")
+    {
+        CHECK(!halg::all(true, false, true, true, true));
+        CHECK(halg::all(true));
+        CHECK(halg::all(true, true, true));
+        CHECK(!halg::all(true, nullptr, true));
+        CHECK(!halg::reverse::all(true, false, true, true, true));
+        CHECK(halg::reverse::all(true));
+        CHECK(halg::reverse::all(true, true, true));
+        CHECK(!halg::reverse::all(true, nullptr, true));
+    }
+
+    SECTION("constexpr")
+    {
+        static_assert(halg::all(true, true, true));
+        static_assert(halg::all_of([](auto x) { return x > 42; }, 500, 300.54));
+        constexpr auto all_lt_42 = halg::all_of([](auto x) { return x < 42; });
+        static_assert(!all_lt_42('a', 4420));
+
+        static_assert(halg::reverse::all(true, true, true));
+        static_assert(
+            halg::reverse::all_of([](auto x) { return x > 42; }, 500, 300.54));
+        constexpr auto all_lt_42_rev =
+            halg::reverse::all_of([](auto x) { return x < 42; });
+        static_assert(!all_lt_42_rev('a', 4420));
+    }
 }
 
 TEST_CASE("any_of", "[HALG]")
@@ -134,6 +161,35 @@ TEST_CASE("any_of", "[HALG]")
         CHECK(!any_are_even_rev(3, 7, 1, true));
         CHECK(!any_are_even_rev()()()()()()()()(1));
     }
+
+    SECTION("identity default")
+    {
+        CHECK(halg::any(true, false, true, true, true));
+        CHECK(!halg::any(false));
+        CHECK(halg::any(true));
+        CHECK(halg::any(true, true, true));
+        CHECK(!halg::any(false, nullptr, false));
+        CHECK(halg::reverse::any(true, false, true, true, true));
+        CHECK(!halg::reverse::any(false));
+        CHECK(halg::reverse::any(true));
+        CHECK(halg::reverse::any(true, true, true));
+        CHECK(!halg::reverse::any(false, nullptr, false));
+    }
+
+    SECTION("constexpr")
+    {
+        static_assert(halg::any(true, nullptr));
+        static_assert(halg::any_of([](auto x) { return x > 42; }, 500, 30.54));
+        constexpr auto any_lt_42 = halg::any_of([](auto x) { return x < 42; });
+        static_assert(!any_lt_42('a', 4420));
+
+        static_assert(halg::reverse::any(true, nullptr));
+        static_assert(
+            halg::reverse::any_of([](auto x) { return x > 42; }, 500, 30.54));
+        constexpr auto any_lt_42_rev =
+            halg::reverse::any_of([](auto x) { return x < 42; });
+        static_assert(!any_lt_42_rev('a', 4420));
+    }
 }
 
 TEST_CASE("none_of", "[HALG]")
@@ -201,5 +257,35 @@ TEST_CASE("none_of", "[HALG]")
         CHECK(!none_are_even_rev(3, 7, 1, true, 2));
         CHECK(none_are_even_rev(3, 7, 1, true));
         CHECK(none_are_even_rev(1));
+    }
+
+    SECTION("identity default")
+    {
+        CHECK(!halg::none(true, false, true, true, true));
+        CHECK(halg::none(false));
+        CHECK(!halg::none(true));
+        CHECK(!halg::none(true, true, true));
+        CHECK(halg::none(false, nullptr, false));
+        CHECK(!halg::reverse::none(true, false, true, true, true));
+        CHECK(halg::reverse::none(false));
+        CHECK(!halg::reverse::none(true));
+        CHECK(!halg::reverse::none(true, true, true));
+        CHECK(halg::reverse::none(false, nullptr, false));
+    }
+
+    SECTION("constexpr")
+    {
+        static_assert(halg::none(false, nullptr));
+        static_assert(halg::none_of([](auto x) { return x > 42; }, 2, 30.54));
+        constexpr auto none_lt_42 =
+            halg::none_of([](auto x) { return x < 42; });
+        static_assert(none_lt_42('a', 4420));
+
+        static_assert(halg::reverse::none(false, nullptr));
+        static_assert(
+            halg::reverse::none_of([](auto x) { return x > 42; }, 2, 30.54));
+        constexpr auto none_lt_42_rev =
+            halg::reverse::none_of([](auto x) { return x < 42; });
+        static_assert(none_lt_42_rev('a', 4420));
     }
 }

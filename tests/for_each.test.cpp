@@ -26,6 +26,13 @@ TEST_CASE("for_each", "[HALG]")
         write_to_ss();
         CHECK(ss.str() == "26.3 hello, world!-4320.5");
     }
+
+    SECTION("constexpr")
+    {
+        constexpr auto nop = halg::for_each([](auto) {});
+        static_assert((nop('a', 1, 4, 2), true));
+        static_assert((halg::for_each([](auto) {}, nullptr, 'a', 4.3), true));
+    }
 }
 
 TEST_CASE("Reversed for_each", "[HALG]")
@@ -50,5 +57,13 @@ TEST_CASE("Reversed for_each", "[HALG]")
         write_to_ss_in_rev(0.5);
         write_to_ss_in_rev();
         CHECK(ss.str() == "-432hello, world! 6.320.5");
+    }
+
+    SECTION("constexpr")
+    {
+        constexpr auto nop_rev = halg::reverse::for_each([](auto) {});
+        static_assert((nop_rev('a', 1, 4, 2), true));
+        static_assert(
+            (halg::reverse::for_each([](auto) {}, nullptr, 'a', 4.3), true));
     }
 }
