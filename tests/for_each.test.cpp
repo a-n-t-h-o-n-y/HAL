@@ -6,7 +6,7 @@
 
 TEST_CASE("for_each", "[HALG]")
 {
-    SECTION("unbound")
+    SECTION("full call")
     {
         auto ss = std::stringstream{};
 
@@ -16,7 +16,7 @@ TEST_CASE("for_each", "[HALG]")
         CHECK(ss.str() == "26.3 hello, world!-4320.5");
     }
 
-    SECTION("bound")
+    SECTION("partial application")
     {
         auto ss          = std::stringstream{};
         auto write_to_ss = halg::for_each([&ss](auto const& x) { ss << x; });
@@ -35,9 +35,9 @@ TEST_CASE("for_each", "[HALG]")
     }
 }
 
-TEST_CASE("Reversed for_each", "[HALG]")
+TEST_CASE("reverse::for_each", "[HALG]")
 {
-    SECTION("unbound")
+    SECTION("full call")
     {
         auto ss = std::stringstream{};
 
@@ -47,7 +47,7 @@ TEST_CASE("Reversed for_each", "[HALG]")
         CHECK(ss.str() == "0.5-432hello, world! 6.32");
     }
 
-    SECTION("bound")
+    SECTION("partial application")
     {
         auto ss = std::stringstream{};
         auto write_to_ss_in_rev =

@@ -6,6 +6,8 @@
 namespace halg {
 namespace detail {
 
+/* ---------------------------Function Objects -------------------------------*/
+
 /// Function object returning given argument transparently.
 struct Identity {
     template <typename T>
@@ -14,6 +16,70 @@ struct Identity {
         return std::forward<T>(x);
     }
 };
+
+/* --------------------------- Reduce Helpers --------------------------------*/
+
+// Templates can't be in nested classes.
+template <typename ReduceFn, typename T, typename BinaryOp>
+class Reduce_partial_application_two {
+   public:
+    constexpr Reduce_partial_application_two(ReduceFn reduce_fn,
+                                             T init,
+                                             BinaryOp binary_op)
+        : reduce_fn_{std::move(reduce_fn)},
+          init_{std::move(init)},
+          binary_op_{std::move(binary_op)}
+    {}
+
+    // Full Application
+    template <typename... Elements>
+    constexpr auto operator()(Elements&&... elements) const -> T
+    {
+        return reduce_fn_(init_, binary_op_,
+                          std::forward<Elements>(elements)...);
+    }
+
+   private:
+    ReduceFn reduce_fn_;
+    T init_;
+    BinaryOp binary_op_;
+};
+
+// Templates can't be in nested classes.
+template <typename ReduceFn, typename T>
+class Reduce_partial_application_one {
+   public:
+    constexpr Reduce_partial_application_one(ReduceFn reduce_fn, T init)
+        : reduce_fn_{std::move(reduce_fn)}, init_{std::move(init)}
+    {}
+
+    // Partial Application
+    template <typename BinaryOp>
+    constexpr auto operator()(BinaryOp&& binary_op) const
+    {
+        return [reduce_fn_ = this->reduce_fn_, init = this->init_,
+                binary_op =
+                    std::forward<BinaryOp>(binary_op)](auto&&... elements) {
+            return reduce_fn_(init, binary_op,
+                              std::forward<decltype(elements)>(elements)...);
+        };
+    }
+
+    // Full Application
+    template <typename BinaryOp, typename... Elements>
+    constexpr auto operator()(BinaryOp&& binary_op,
+                              Elements&&... elements) const -> T
+    {
+        return reduce_fn_(init_, std::forward<BinaryOp>(binary_op),
+                          std::forward<Elements>(elements)...);
+    }
+
+   private:
+    ReduceFn reduce_fn_;
+    T init_;
+};
+
+/* ---------------------------------------------------------------------------*/
 
 }  // namespace detail
 
@@ -32,8 +98,37 @@ constexpr auto for_each(UnaryFunction&& func)
     };
 }
 
-// Is_transformation_fn
-// TODO reduce(<Init_t(Arg const&, Init_t init, Args...)>) -> Init_t
+/* --------------------------------- reduce --------------------------------- */
+template <typename T, typename BinaryOp, typename... Elements>
+constexpr auto reduce(T init, BinaryOp&& binary_op, Elements&&... elements) -> T
+{
+    [[maybe_unused]] auto x = ((init = binary_op(init, elements), true) && ...);
+    return init;
+}
+
+template <typename T>
+constexpr auto reduce(T&& init)
+{
+    return detail::Reduce_partial_application_one{
+        [](auto&& i, auto&& binary_op, auto&&... elements) {
+            return reduce(std::forward<decltype(i)>(i),
+                          std::forward<decltype(binary_op)>(binary_op),
+                          std::forward<decltype(elements)>(elements)...);
+        },
+        std::forward<T>(init)};
+}
+
+template <typename T, typename BinaryOp>
+constexpr auto reduce(T&& init, BinaryOp&& binary_op)
+{
+    return detail::Reduce_partial_application_two{
+        [](auto&& i, auto&& binary_op, auto&&... elements) {
+            return reduce(std::forward<decltype(i)>(i),
+                          std::forward<decltype(binary_op)>(binary_op),
+                          std::forward<decltype(elements)>(elements)...);
+        },
+        std::forward<T>(init), std::forward<BinaryOp>(binary_op)};
+}
 
 /* --------------------------------- all_of --------------------------------- */
 template <typename UnaryPredicate, typename... Elements>
@@ -108,8 +203,8 @@ namespace reverse {
 template <typename UnaryFunction, typename... Elements>
 constexpr void for_each(UnaryFunction&& func, Elements&&... elements)
 {
-    auto foo = 0;
-    (foo = ... = (func(elements), 0));
+    auto foo                      = 0;
+    [[maybe_unused]] auto const i = (foo = ... = (func(elements), 0));
 }
 
 template <typename UnaryFunction>
@@ -128,7 +223,8 @@ constexpr auto all_of(UnaryPredicate&& predicate, Elements&&... elements)
 {
     auto x   = true;
     auto foo = 0;
-    (foo = ... = (x = x && predicate(std::forward<Elements>(elements))));
+    [[maybe_unused]] auto const i =
+        (foo = ... = (x = x && predicate(std::forward<Elements>(elements))));
     return x;
 }
 
@@ -155,7 +251,8 @@ constexpr auto any_of(UnaryPredicate&& predicate, Elements&&... elements)
 {
     auto x   = false;
     auto foo = 0;
-    (foo = ... = (x = x || predicate(std::forward<Elements>(elements))));
+    [[maybe_unused]] auto const i =
+        (foo = ... = (x = x || predicate(std::forward<Elements>(elements))));
     return x;
 }
 
@@ -198,6 +295,42 @@ constexpr auto none(Elements&&... elements) -> bool
 {
     return reverse::none_of(detail::Identity{},
                             std::forward<Elements>(elements)...);
+}
+
+/* --------------------------------- reduce --------------------------------- */
+template <typename T, typename BinaryOp, typename... Elements>
+constexpr auto reduce(T init, BinaryOp&& binary_op, Elements&&... elements) -> T
+{
+    auto foo = 0;
+    [[maybe_unused]] auto const i =
+        (foo = ... = (init = binary_op(init, elements), true));
+    return init;
+}
+
+template <typename T>
+constexpr auto reduce(T&& init)
+{
+    return detail::Reduce_partial_application_one{
+        [](auto&& i, auto&& binary_op, auto&&... elements) {
+            return reverse::reduce(
+                std::forward<decltype(i)>(i),
+                std::forward<decltype(binary_op)>(binary_op),
+                std::forward<decltype(elements)>(elements)...);
+        },
+        std::forward<T>(init)};
+}
+
+template <typename T, typename BinaryOp>
+constexpr auto reduce(T&& init, BinaryOp&& binary_op)
+{
+    return detail::Reduce_partial_application_two{
+        [](auto&& i, auto&& binary_op, auto&&... elements) {
+            return reverse::reduce(
+                std::forward<decltype(i)>(i),
+                std::forward<decltype(binary_op)>(binary_op),
+                std::forward<decltype(elements)>(elements)...);
+        },
+        std::forward<T>(init), std::forward<BinaryOp>(binary_op)};
 }
 
 }  // namespace reverse

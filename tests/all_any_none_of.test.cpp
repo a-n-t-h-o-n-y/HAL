@@ -6,7 +6,7 @@
 
 TEST_CASE("all_of", "[HALG]")
 {
-    SECTION("unbound")
+    SECTION("full call")
     {
         CHECK(!halg::all_of([](auto x) { return x; }, true, false, true));
         CHECK(halg::all_of([](auto x) { return x; }, true));
@@ -14,7 +14,7 @@ TEST_CASE("all_of", "[HALG]")
         CHECK(!halg::all_of([](auto x) { return x > 42; }, 54.3, -1, 'A'));
     }
 
-    SECTION("bound")
+    SECTION("partial application")
     {
         auto all_are_true = halg::all_of([](auto x) { return x; });
 
@@ -48,7 +48,7 @@ TEST_CASE("all_of", "[HALG]")
         CHECK(!halg::reverse::all_of([](auto x) { return x; }, false));
     }
 
-    SECTION("reverse and bound")
+    SECTION("reverse and partial application")
     {
         auto ss               = std::stringstream{};
         auto all_are_gt_5_rev = halg::reverse::all_of([&](auto x) {
@@ -97,7 +97,7 @@ TEST_CASE("all_of", "[HALG]")
 
 TEST_CASE("any_of", "[HALG]")
 {
-    SECTION("unbound")
+    SECTION("full call")
     {
         CHECK(halg::any_of([](auto x) { return x; }, true, false, true));
         CHECK(halg::any_of([](auto x) { return x; }, true));
@@ -107,7 +107,7 @@ TEST_CASE("any_of", "[HALG]")
         CHECK(!halg::any_of([](auto x) { return x > 42; }, 0, 1.4, 3));
     }
 
-    SECTION("bound")
+    SECTION("partial application")
     {
         auto any_are_true = halg::any_of([](auto x) { return x; });
 
@@ -142,7 +142,7 @@ TEST_CASE("any_of", "[HALG]")
         CHECK(!halg::reverse::any_of([](auto x) { return x; }, false));
     }
 
-    SECTION("reverse and bound")
+    SECTION("reverse and partial application")
     {
         auto ss               = std::stringstream{};
         auto any_are_gt_5_rev = halg::reverse::any_of([&](auto x) {
@@ -194,7 +194,7 @@ TEST_CASE("any_of", "[HALG]")
 
 TEST_CASE("none_of", "[HALG]")
 {
-    SECTION("unbound")
+    SECTION("full call")
     {
         CHECK(!halg::none_of([](auto x) { return x; }, true, false, true));
         CHECK(!halg::none_of([](auto x) { return x; }, true));
@@ -204,7 +204,7 @@ TEST_CASE("none_of", "[HALG]")
         CHECK(halg::none_of([](auto x) { return x > 42; }, 0, 1.4, 3));
     }
 
-    SECTION("bound")
+    SECTION("partial application")
     {
         auto none_are_true = halg::none_of([](auto x) { return x; });
 
@@ -239,7 +239,7 @@ TEST_CASE("none_of", "[HALG]")
         CHECK(halg::reverse::none_of([](auto x) { return x; }, false));
     }
 
-    SECTION("reverse and bound")
+    SECTION("reverse and partial application")
     {
         auto ss                = std::stringstream{};
         auto none_are_gt_5_rev = halg::reverse::none_of([&](auto x) {
