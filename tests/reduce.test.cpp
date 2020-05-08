@@ -37,6 +37,8 @@ TEST_CASE("reduce", "[HALG]")
         CHECK(sum_reduce(1, 2, 3, 4) == 10);
         CHECK(sum_reduce(1) == 1);
 
+        CHECK(empty_reduce(sum, 1, 2, 3, 4) == 10);
+
         auto product_reduce = halg::reduce(1, product);
         CHECK(product_reduce(4, 3, 2, 1) == 24);
 

@@ -1,5 +1,6 @@
 #ifndef HALG_HPP
 #define HALG_HPP
+#include <functional>
 #include <type_traits>
 #include <utility>
 
@@ -19,73 +20,81 @@ struct Identity {
 
 /* --------------------------- Reduce Helpers --------------------------------*/
 
-// Templates can't be in nested classes.
-template <typename ReduceFn, typename T, typename BinaryOp>
-class Reduce_partial_application_two {
+/// Provides a single variadic call operator to finish the call to \p fn.
+template <typename Fn>
+class Partial_application_one {
    public:
-    constexpr Reduce_partial_application_two(ReduceFn reduce_fn,
-                                             T init,
-                                             BinaryOp binary_op)
-        : reduce_fn_{std::move(reduce_fn)},
-          init_{std::move(init)},
-          binary_op_{std::move(binary_op)}
-    {}
+    constexpr Partial_application_one(Fn fn) : fn_{std::move(fn)} {}
 
-    // Full Application
+   public:
     template <typename... Elements>
-    constexpr auto operator()(Elements&&... elements) const -> T
+    constexpr auto operator()(Elements&&... elements) const
     {
-        return reduce_fn_(init_, binary_op_,
-                          std::forward<Elements>(elements)...);
+        return fn_(std::forward<Elements>(elements)...);
     }
 
-   private:
-    ReduceFn reduce_fn_;
-    T init_;
-    BinaryOp binary_op_;
+   protected:
+    Fn fn_;
 };
 
-// Templates can't be in nested classes.
-template <typename ReduceFn, typename T>
-class Reduce_partial_application_one {
-   public:
-    constexpr Reduce_partial_application_one(ReduceFn reduce_fn, T init)
-        : reduce_fn_{std::move(reduce_fn)}, init_{std::move(init)}
-    {}
+/// Provides call-op that binds one argument and returns a variadic callable.
+template <typename Fn>
+class Partial_application_two : public Partial_application_one<Fn> {
+   private:
+    using Base_t = Partial_application_one<Fn>;
 
-    // Partial Application
-    template <typename BinaryOp>
-    constexpr auto operator()(BinaryOp&& binary_op) const
+   public:
+    constexpr Partial_application_two(Fn fn) : Base_t{std::move(fn)} {}
+
+   public:
+    using Base_t::operator();
+
+    template <typename T>
+    constexpr auto operator()(T x) const
     {
-        return [reduce_fn_ = this->reduce_fn_, init = this->init_,
-                binary_op =
-                    std::forward<BinaryOp>(binary_op)](auto&&... elements) {
-            return reduce_fn_(init, binary_op,
-                              std::forward<decltype(elements)>(elements)...);
+        return [fn_ = Base_t::fn_, x = std::move(x)](auto&&... elements) {
+            return fn_(x, std::forward<decltype(elements)>(elements)...);
+        };
+    }
+};
+
+/// Provides call-op that binds two arguments and returns a variadic callable.
+template <typename Fn>
+class Partial_application_three : public Partial_application_two<Fn> {
+   private:
+    using Base_t = Partial_application_two<Fn>;
+
+   public:
+    using Base_t::operator();
+
+    constexpr Partial_application_three(Fn fn) : Base_t{std::move(fn)} {}
+
+   public:
+    template <typename T, typename U>
+    constexpr auto operator()(T x, U y) const
+    {
+        return [fn_ = Base_t::fn_, x = std::move(x),
+                y = std::move(y)](auto&&... elements) {
+            return fn_(x, y, std::forward<decltype(elements)>(elements)...);
         };
     }
 
-    // Full Application
-    template <typename BinaryOp, typename... Elements>
-    constexpr auto operator()(BinaryOp&& binary_op,
-                              Elements&&... elements) const -> T
+    template <typename T>
+    constexpr auto operator()(T x) const
     {
-        return reduce_fn_(init_, std::forward<BinaryOp>(binary_op),
-                          std::forward<Elements>(elements)...);
+        return [fn_ = Base_t::fn_, x = std::move(x)](auto&& y) {
+            return [fn_ = fn_, x = x, y = y](auto&&... elements) {
+                return fn_(x, y, std::forward<decltype(elements)>(elements)...);
+            };
+        };
     }
-
-   private:
-    ReduceFn reduce_fn_;
-    T init_;
 };
-
-/* ---------------------------------------------------------------------------*/
 
 }  // namespace detail
 
 /* -------------------------------- for_each -------------------------------- */
 template <typename UnaryFunction, typename... Elements>
-constexpr void for_each(UnaryFunction&& func, Elements&&... elements)
+constexpr auto for_each(UnaryFunction&& func, Elements&&... elements) -> void
 {
     (func(std::forward<Elements>(elements)), ...);
 }
@@ -102,32 +111,99 @@ constexpr auto for_each(UnaryFunction&& func)
 template <typename T, typename BinaryOp, typename... Elements>
 constexpr auto reduce(T init, BinaryOp&& binary_op, Elements&&... elements) -> T
 {
-    [[maybe_unused]] auto x = ((init = binary_op(init, elements), true) && ...);
+    [[maybe_unused]] auto const x =
+        ((init = binary_op(init, std::forward<Elements>(elements)), true) &&
+         ...);
     return init;
 }
 
 template <typename T>
-constexpr auto reduce(T&& init)
+constexpr auto reduce(T init)
 {
-    return detail::Reduce_partial_application_one{
-        [](auto&& i, auto&& binary_op, auto&&... elements) {
-            return reduce(std::forward<decltype(i)>(i),
-                          std::forward<decltype(binary_op)>(binary_op),
+    return detail::Partial_application_two{
+        [init = std::move(init)](auto&& binary_op, auto&&... elements) {
+            return reduce(init, std::forward<decltype(binary_op)>(binary_op),
                           std::forward<decltype(elements)>(elements)...);
-        },
-        std::forward<T>(init)};
+        }};
 }
 
 template <typename T, typename BinaryOp>
-constexpr auto reduce(T&& init, BinaryOp&& binary_op)
+constexpr auto reduce(T init, BinaryOp binary_op)
 {
-    return detail::Reduce_partial_application_two{
-        [](auto&& i, auto&& binary_op, auto&&... elements) {
-            return reduce(std::forward<decltype(i)>(i),
-                          std::forward<decltype(binary_op)>(binary_op),
+    return detail::Partial_application_one{
+        [init      = std::move(init),
+         binary_op = std::move(binary_op)](auto&&... elements) {
+            return reduce(init, binary_op,
                           std::forward<decltype(elements)>(elements)...);
-        },
-        std::forward<T>(init), std::forward<BinaryOp>(binary_op)};
+        }};
+}
+
+/* ------------------------------- transform -------------------------------- */
+template <typename MapFn, typename... Elements>
+constexpr auto transform(MapFn&& map_fn, Elements&&... elements) -> void
+{
+    [[maybe_unused]] auto const x =
+        ((elements = map_fn(std::forward<Elements>(elements)), true) && ...);
+}
+
+template <typename MapFn>
+constexpr auto transform(MapFn&& map_fn)
+{
+    return [f = std::forward<MapFn>(map_fn)](auto&&... elements) {
+        return transform(f, std::forward<decltype(elements)>(elements)...);
+    };
+}
+
+/* --------------------------- transform_reduce ----------------------------- */
+
+template <typename T, typename MapFn, typename BinaryOp, typename... Elements>
+constexpr auto transform_reduce(T init,
+                                MapFn&& map_fn,
+                                BinaryOp reduce_fn,
+                                Elements&&... elements) -> T
+{
+    [[maybe_unused]] auto const x =
+        ((init = reduce_fn(init, map_fn(std::forward<Elements>(elements))),
+          true) &&
+         ...);
+    return init;
+}
+
+template <typename T>
+constexpr auto transform_reduce(T init)
+{
+    return detail::Partial_application_three{
+        [init = std::move(init)](auto&& map_fn, auto&& reduce_fn,
+                                 auto&&... elements) {
+            return transform_reduce(
+                init, std::forward<decltype(map_fn)>(map_fn),
+                std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename MapFn>
+constexpr auto transform_reduce(T init, MapFn map_fn)
+{
+    return detail::Partial_application_two{
+        [init = std::move(init), map_fn = std::move(map_fn)](
+            auto&& reduce_fn, auto&&... elements) {
+            return transform_reduce(
+                init, map_fn, std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename MapFn, typename BinaryOp>
+constexpr auto transform_reduce(T init, MapFn map_fn, BinaryOp reduce_fn)
+{
+    return detail::Partial_application_one{
+        [init = std::move(init), map_fn = std::move(map_fn),
+         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
+            return transform_reduce(
+                init, map_fn, reduce_fn,
+                std::forward<decltype(elements)>(elements)...);
+        }};
 }
 
 /* --------------------------------- all_of --------------------------------- */
@@ -135,6 +211,7 @@ template <typename UnaryPredicate, typename... Elements>
 constexpr auto all_of(UnaryPredicate&& predicate, Elements&&... elements)
     -> bool
 {
+    // TODO implement with transform_reduce(...)
     return (predicate(std::forward<Elements>(elements)) && ...);
 }
 
@@ -201,7 +278,7 @@ namespace reverse {
 
 /* --------------------------- Reversed for_each ---------------------------- */
 template <typename UnaryFunction, typename... Elements>
-constexpr void for_each(UnaryFunction&& func, Elements&&... elements)
+constexpr auto for_each(UnaryFunction&& func, Elements&&... elements) -> void
 {
     auto foo                      = 0;
     [[maybe_unused]] auto const i = (foo = ... = (func(elements), 0));
@@ -308,30 +385,98 @@ constexpr auto reduce(T init, BinaryOp&& binary_op, Elements&&... elements) -> T
 }
 
 template <typename T>
-constexpr auto reduce(T&& init)
+constexpr auto reduce(T init)
 {
-    return detail::Reduce_partial_application_one{
-        [](auto&& i, auto&& binary_op, auto&&... elements) {
+    return detail::Partial_application_two{
+        [init = std::move(init)](auto&& binary_op, auto&&... elements) {
             return reverse::reduce(
-                std::forward<decltype(i)>(i),
-                std::forward<decltype(binary_op)>(binary_op),
+                init, std::forward<decltype(binary_op)>(binary_op),
                 std::forward<decltype(elements)>(elements)...);
-        },
-        std::forward<T>(init)};
+        }};
 }
 
 template <typename T, typename BinaryOp>
-constexpr auto reduce(T&& init, BinaryOp&& binary_op)
+constexpr auto reduce(T init, BinaryOp binary_op)
 {
-    return detail::Reduce_partial_application_two{
-        [](auto&& i, auto&& binary_op, auto&&... elements) {
+    return detail::Partial_application_one{
+        [init      = std::move(init),
+         binary_op = std::move(binary_op)](auto&&... elements) {
             return reverse::reduce(
-                std::forward<decltype(i)>(i),
-                std::forward<decltype(binary_op)>(binary_op),
-                std::forward<decltype(elements)>(elements)...);
-        },
-        std::forward<T>(init), std::forward<BinaryOp>(binary_op)};
+                init, binary_op, std::forward<decltype(elements)>(elements)...);
+        }};
 }
+
+/* ------------------------------- transform -------------------------------- */
+
+template <typename MapFn, typename... Elements>
+constexpr auto transform(MapFn&& map_fn, Elements&&... elements) -> void
+{
+    auto foo = 0;
+    [[maybe_unused]] auto const i =
+        (foo = ... = (elements = map_fn(std::forward<Elements>(elements)), 0));
+}
+
+template <typename MapFn>
+constexpr auto transform(MapFn&& map_fn)
+{
+    return [f = std::forward<MapFn>(map_fn)](auto&&... elements) {
+        return reverse::transform(
+            f, std::forward<decltype(elements)>(elements)...);
+    };
+}
+
+/* --------------------------- transform_reduce ----------------------------- */
+
+template <typename T, typename MapFn, typename BinaryOp, typename... Elements>
+constexpr auto transform_reduce(T init,
+                                MapFn&& map_fn,
+                                BinaryOp reduce_fn,
+                                Elements&&... elements) -> T
+{
+    auto x = 0;
+    (x = ... = ((
+         init = reduce_fn(init, map_fn(std::forward<Elements>(elements))), 0)));
+    return init;
+}
+
+template <typename T>
+constexpr auto transform_reduce(T init)
+{
+    return detail::Partial_application_three{
+        [init = std::move(init)](auto&& map_fn, auto&& reduce_fn,
+                                 auto&&... elements) {
+            return reverse::transform_reduce(
+                init, std::forward<decltype(map_fn)>(map_fn),
+                std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename MapFn>
+constexpr auto transform_reduce(T init, MapFn map_fn)
+{
+    return detail::Partial_application_two{
+        [init = std::move(init), map_fn = std::move(map_fn)](
+            auto&& reduce_fn, auto&&... elements) {
+            return reverse::transform_reduce(
+                init, map_fn, std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename MapFn, typename BinaryOp>
+constexpr auto transform_reduce(T init, MapFn map_fn, BinaryOp reduce_fn)
+{
+    return detail::Partial_application_one{
+        [init = std::move(init), map_fn = std::move(map_fn),
+         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
+            return reverse::transform_reduce(
+                init, map_fn, reduce_fn,
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+/* -------------------------------------------------------------------------- */
 
 }  // namespace reverse
 }  // namespace halg
