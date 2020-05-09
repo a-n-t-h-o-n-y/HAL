@@ -1,5 +1,6 @@
 #ifndef HALG_HPP
 #define HALG_HPP
+#include <cstddef>
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -206,6 +207,47 @@ constexpr auto transform_reduce(T init, MapFn map_fn, BinaryOp reduce_fn)
         }};
 }
 
+/* -------------------------------- count_if -------------------------------- */
+
+template <typename UnaryPredicate, typename... Elements>
+constexpr auto count_if(UnaryPredicate&& predicate, Elements&&... elements)
+    -> std::size_t
+{
+    return reduce(
+        0uL,
+        [&predicate](auto count, auto const& x) {
+            return predicate(x) ? count + 1 : count;
+        },
+        std::forward<Elements>(elements)...);
+}
+
+template <typename UnaryPredicate>
+constexpr auto count_if(UnaryPredicate&& predicate)
+{
+    return [predicate =
+                std::forward<UnaryPredicate>(predicate)](auto&&... elements) {
+        return count_if(predicate,
+                        std::forward<decltype(elements)>(elements)...);
+    };
+}
+
+/* --------------------------------- count ---------------------------------- */
+
+template <typename T, typename... Elements>
+constexpr auto count(T&& x, Elements&&... elements) -> std::size_t
+{
+    return count_if([&x](auto y) { return y == x; },
+                    std::forward<Elements>(elements)...);
+}
+
+template <typename T>
+constexpr auto count(T&& x)
+{
+    return [x = std::forward<T>(x)](auto&&... elements) {
+        return count(x, std::forward<decltype(elements)>(elements)...);
+    };
+}
+
 /* --------------------------------- all_of --------------------------------- */
 template <typename UnaryPredicate, typename... Elements>
 constexpr auto all_of(UnaryPredicate&& predicate, Elements&&... elements)
@@ -276,7 +318,7 @@ constexpr auto none(Elements&&... elements) -> bool
 
 namespace reverse {
 
-/* --------------------------- Reversed for_each ---------------------------- */
+/* --------------------------- reverse::for_each ---------------------------- */
 template <typename UnaryFunction, typename... Elements>
 constexpr auto for_each(UnaryFunction&& func, Elements&&... elements) -> void
 {
@@ -293,7 +335,7 @@ constexpr auto for_each(UnaryFunction&& func)
     };
 }
 
-/* ---------------------------- Reversed all_of ----------------------------- */
+/* ---------------------------- reverse::all_of ----------------------------- */
 template <typename UnaryPredicate, typename... Elements>
 constexpr auto all_of(UnaryPredicate&& predicate, Elements&&... elements)
     -> bool
@@ -321,7 +363,7 @@ constexpr auto all(Elements&&... elements) -> bool
                            std::forward<Elements>(elements)...);
 }
 
-/* ---------------------------- Reversed any_of ----------------------------- */
+/* ---------------------------- reverse::any_of ----------------------------- */
 template <typename UnaryPredicate, typename... Elements>
 constexpr auto any_of(UnaryPredicate&& predicate, Elements&&... elements)
     -> bool
@@ -349,7 +391,7 @@ constexpr auto any(Elements&&... elements) -> bool
                            std::forward<Elements>(elements)...);
 }
 
-/* --------------------------- Reversed none_of ----------------------------- */
+/* --------------------------- reverse::none_of ----------------------------- */
 template <typename UnaryPredicate, typename... Elements>
 constexpr auto none_of(UnaryPredicate&& predicate, Elements&&... elements)
     -> bool
@@ -374,7 +416,7 @@ constexpr auto none(Elements&&... elements) -> bool
                             std::forward<Elements>(elements)...);
 }
 
-/* --------------------------------- reduce --------------------------------- */
+/* ---------------------------- reverse::reduce ----------------------------- */
 template <typename T, typename BinaryOp, typename... Elements>
 constexpr auto reduce(T init, BinaryOp&& binary_op, Elements&&... elements) -> T
 {
@@ -406,7 +448,7 @@ constexpr auto reduce(T init, BinaryOp binary_op)
         }};
 }
 
-/* ------------------------------- transform -------------------------------- */
+/* -------------------------- reverse::transform ---------------------------- */
 
 template <typename MapFn, typename... Elements>
 constexpr auto transform(MapFn&& map_fn, Elements&&... elements) -> void
@@ -425,7 +467,7 @@ constexpr auto transform(MapFn&& map_fn)
     };
 }
 
-/* --------------------------- transform_reduce ----------------------------- */
+/* ---------------------- reverse::transform_reduce ------------------------- */
 
 template <typename T, typename MapFn, typename BinaryOp, typename... Elements>
 constexpr auto transform_reduce(T init,

@@ -5,6 +5,7 @@ add_executable(tests
     reduce.test.cpp
     transform.test.cpp
     transform_reduce.test.cpp
+    count.test.cpp
     all_any_none_of.test.cpp
 )
 
