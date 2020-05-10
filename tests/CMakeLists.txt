@@ -7,6 +7,7 @@ add_executable(tests
     transform_reduce.test.cpp
     count.test.cpp
     all_any_none_of.test.cpp
+    get_first_last.test.cpp
 )
 
 target_link_libraries(tests

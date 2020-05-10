@@ -2,6 +2,7 @@
 #define HALG_HPP
 #include <cstddef>
 #include <functional>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -112,9 +113,7 @@ constexpr auto for_each(UnaryFunction&& func)
 template <typename T, typename BinaryOp, typename... Elements>
 constexpr auto reduce(T init, BinaryOp&& binary_op, Elements&&... elements) -> T
 {
-    [[maybe_unused]] auto const x =
-        ((init = binary_op(init, std::forward<Elements>(elements)), true) &&
-         ...);
+    ((init = binary_op(init, std::forward<Elements>(elements))), ...);
     return init;
 }
 
@@ -143,8 +142,7 @@ constexpr auto reduce(T init, BinaryOp binary_op)
 template <typename MapFn, typename... Elements>
 constexpr auto transform(MapFn&& map_fn, Elements&&... elements) -> void
 {
-    [[maybe_unused]] auto const x =
-        ((elements = map_fn(std::forward<Elements>(elements)), true) && ...);
+    ((elements = map_fn(std::forward<Elements>(elements))), ...);
 }
 
 template <typename MapFn>
@@ -163,10 +161,7 @@ constexpr auto transform_reduce(T init,
                                 BinaryOp reduce_fn,
                                 Elements&&... elements) -> T
 {
-    [[maybe_unused]] auto const x =
-        ((init = reduce_fn(init, map_fn(std::forward<Elements>(elements))),
-          true) &&
-         ...);
+    ((init = reduce_fn(init, map_fn(std::forward<Elements>(elements)))), ...);
     return init;
 }
 
@@ -316,6 +311,35 @@ constexpr auto none(Elements&&... elements) -> bool
     return none_of(detail::Identity{}, std::forward<Elements>(elements)...);
 }
 
+/* ---------------------------------- get ----------------------------------- */
+
+template <std::size_t I, typename... Elements>
+auto get(Elements&&... elements)
+{
+    if constexpr (sizeof...(Elements) == 0)
+        return;
+    else {
+        return std::get<I>(
+            std::forward_as_tuple(std::forward<Elements>(elements)...));
+    }
+}
+
+/* --------------------------------- first ---------------------------------- */
+
+template <typename... Elements>
+auto first(Elements&&... elements)
+{
+    return get<0>(std::forward<Elements>(elements)...);
+}
+
+/* --------------------------------- last ----------------------------------- */
+
+template <typename... Elements>
+auto last(Elements&&... elements)
+{
+    return get<sizeof...(Elements) - 1>(std::forward<Elements>(elements)...);
+}
+
 namespace reverse {
 
 /* --------------------------- reverse::for_each ---------------------------- */
@@ -422,7 +446,7 @@ constexpr auto reduce(T init, BinaryOp&& binary_op, Elements&&... elements) -> T
 {
     auto foo = 0;
     [[maybe_unused]] auto const i =
-        (foo = ... = (init = binary_op(init, elements), true));
+        (foo = ... = (init = binary_op(init, elements), 0));
     return init;
 }
 
