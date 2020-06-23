@@ -13,7 +13,7 @@ add_executable(tests
 
 target_link_libraries(tests
     PUBLIC
-        halg
+        hal
         catch_two
 )
 

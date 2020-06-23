@@ -1,4 +1,4 @@
-# Heterogeneous Algorithms Library(HAL)
+# Heterogeneous Algorithms Library (HAL)
 
 Provides a basic set of algorithms that will work over a variadic template of
 parameters, similar to how STL algorithms work over containers.
@@ -10,8 +10,8 @@ parameters, similar to how STL algorithms work over containers.
   can be bound by calling the function without the pack, or any partial number
   of parameters, these calls return a callable object with the given parameters
   bound.
-- All algorithms are in the `halg` namespace, versions that work on elements in
-  reverse order are in the `halg::reverse` namespace.
+- All algorithms are in the `hal` namespace, versions that work on elements in
+  reverse order are in the `hal::reverse` namespace.
 - Empty parameter packs cannot be used, will only return a callable object.
 
 ```cpp
@@ -32,14 +32,14 @@ parameters, similar to how STL algorithms work over containers.
 ##### Normal Use
 ```cpp
 auto ss = std::stringstream{};
-halg::for_each([&ss](auto const& x) { ss << x; }, 2, 6.3, ' ', "hello, world!", -432, 0.5);
+hal::for_each([&ss](auto const& x) { ss << x; }, 2, 6.3, ' ', "hello, world!", -432, 0.5);
 assert(ss.str() == "26.3 hello, world!-4320.5");
 ```
 
 ##### Partial Application
 ```cpp
 auto ss          = std::stringstream{};
-auto write_to_ss = halg::for_each([&ss](auto const& x) { ss << x; });
+auto write_to_ss = hal::for_each([&ss](auto const& x) { ss << x; });
 
 write_to_ss(2, 6.3, ' ', "hello, world!", -432);
 write_to_ss(0.5);
@@ -50,7 +50,7 @@ assert(ss.str() == "26.3 hello, world!-4320.5");
 ##### Reverse Order && Partial Application
 ```cpp
 auto ss = std::stringstream{};
-auto write_to_ss_in_rev = halg::reverse::for_each([&ss](auto const& x) { ss << x; });
+auto write_to_ss_in_rev = hal::reverse::for_each([&ss](auto const& x) { ss << x; });
 
 write_to_ss_in_rev(2, 6.3, ' ', "hello, world!", -432);
 write_to_ss_in_rev(0.5);

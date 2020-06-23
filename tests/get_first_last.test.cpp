@@ -1,37 +1,37 @@
 #include <catch2/catch.hpp>
 
-#include <halg.hpp>
+#include <hal.hpp>
 
-TEST_CASE("first", "[HALG]")
+TEST_CASE("first", "[HAL]")
 {
-    CHECK(halg::first(1, 2, 'a', 4.3) == 1);
-    CHECK(halg::first(2.44, 1, 2, 'a', 4.3) == 2.44);
-    CHECK(typeid(halg::first()) == typeid(void));
+    CHECK(hal::first(1, 2, 'a', 4.3) == 1);
+    CHECK(hal::first(2.44, 1, 2, 'a', 4.3) == 2.44);
+    CHECK(typeid(hal::first()) == typeid(void));
 
-    static_assert(halg::first(1, 2, 'a', 4.3) == 1);
-    static_assert(halg::first(2.44, 1, 2, 'a', 4.3) == 2.44);
+    static_assert(hal::first(1, 2, 'a', 4.3) == 1);
+    static_assert(hal::first(2.44, 1, 2, 'a', 4.3) == 2.44);
 }
 
-TEST_CASE("last", "[HALG]")
+TEST_CASE("last", "[HAL]")
 {
-    CHECK(halg::last(1, 2, 'a', 4.3) == 4.3);
-    CHECK(halg::last(2.44, 1, 2, 'a', 4.3, 'b') == 'b');
-    CHECK(typeid(halg::last()) == typeid(void));
-    static_assert(halg::last(1, 2, 'a', 4.3) == 4.3);
-    static_assert(halg::last(2.44, 1, 2, 'a', 4.3, 'b') == 'b');
+    CHECK(hal::last(1, 2, 'a', 4.3) == 4.3);
+    CHECK(hal::last(2.44, 1, 2, 'a', 4.3, 'b') == 'b');
+    CHECK(typeid(hal::last()) == typeid(void));
+    static_assert(hal::last(1, 2, 'a', 4.3) == 4.3);
+    static_assert(hal::last(2.44, 1, 2, 'a', 4.3, 'b') == 'b');
 }
 
-TEST_CASE("get", "[HALG]")
+TEST_CASE("get", "[HAL]")
 {
-    CHECK(halg::get<2>(1, 2, 'a', 4.3) == 'a');
-    CHECK(halg::get<0>(2.44, 1, 2, 'a', 4.3) == 2.44);
-    CHECK(halg::get<4>(2.44, 1, 2, 'a', 4.3) == 4.3);
-    CHECK(halg::get<1>(2.44, 1, 2, 'a', 4.3) == 1);
-    CHECK(typeid(halg::get<5>()) == typeid(void));
-    CHECK(typeid(halg::get<0>()) == typeid(void));
+    CHECK(hal::get<2>(1, 2, 'a', 4.3) == 'a');
+    CHECK(hal::get<0>(2.44, 1, 2, 'a', 4.3) == 2.44);
+    CHECK(hal::get<4>(2.44, 1, 2, 'a', 4.3) == 4.3);
+    CHECK(hal::get<1>(2.44, 1, 2, 'a', 4.3) == 1);
+    CHECK(typeid(hal::get<5>()) == typeid(void));
+    CHECK(typeid(hal::get<0>()) == typeid(void));
 
-    static_assert(halg::get<2>(1, 2, 'a', 4.3) == 'a');
-    static_assert(halg::get<0>(2.44, 1, 2, 'a', 4.3) == 2.44);
-    static_assert(halg::get<4>(2.44, 1, 2, 'a', 4.3) == 4.3);
-    static_assert(halg::get<1>(2.44, 1, 2, 'a', 4.3) == 1);
+    static_assert(hal::get<2>(1, 2, 'a', 4.3) == 'a');
+    static_assert(hal::get<0>(2.44, 1, 2, 'a', 4.3) == 2.44);
+    static_assert(hal::get<4>(2.44, 1, 2, 'a', 4.3) == 4.3);
+    static_assert(hal::get<1>(2.44, 1, 2, 'a', 4.3) == 1);
 }

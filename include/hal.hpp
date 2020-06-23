@@ -1,12 +1,12 @@
-#ifndef HALG_HPP
-#define HALG_HPP
+#ifndef HAL_HPP
+#define HAL_HPP
 #include <cstddef>
 #include <functional>
 #include <tuple>
 #include <type_traits>
 #include <utility>
 
-namespace halg {
+namespace hal {
 namespace detail {
 
 /* ---------------------------Function Objects -------------------------------*/
@@ -462,7 +462,7 @@ constexpr auto all_of(UnaryOp predicate)
 template <typename... Elements>
 constexpr auto all(Elements&&... elements) -> bool
 {
-    return reverse::all_of(halg::detail::Identity{},
+    return reverse::all_of(hal::detail::Identity{},
                            std::forward<Elements>(elements)...);
 }
 
@@ -504,7 +504,7 @@ constexpr auto any_of(UnaryOp predicate)
 template <typename... Elements>
 constexpr auto any(Elements&&... elements) -> bool
 {
-    return reverse::any_of(halg::detail::Identity{},
+    return reverse::any_of(hal::detail::Identity{},
                            std::forward<Elements>(elements)...);
 }
 
@@ -528,7 +528,7 @@ constexpr auto none_of(UnaryOp predicate)
 template <typename... Elements>
 constexpr auto none(Elements&&... elements) -> bool
 {
-    return reverse::none_of(halg::detail::Identity{},
+    return reverse::none_of(hal::detail::Identity{},
                             std::forward<Elements>(elements)...);
 }
 
@@ -565,7 +565,7 @@ constexpr auto reduce(T init, BinaryOp&& reduce_fn, Elements&&... elements) -> T
 template <typename T>
 constexpr auto reduce(T init)
 {
-    return halg::detail::Partial_application_two{
+    return hal::detail::Partial_application_two{
         [init = std::move(init)](auto&& reduce_fn, auto&&... elements) {
             return reverse::reduce(
                 init, std::forward<decltype(reduce_fn)>(reduce_fn),
@@ -576,7 +576,7 @@ constexpr auto reduce(T init)
 template <typename T, typename BinaryOp>
 constexpr auto reduce(T init, BinaryOp reduce_fn)
 {
-    return halg::detail::Partial_application_one{
+    return hal::detail::Partial_application_one{
         [init      = std::move(init),
          reduce_fn = std::move(reduce_fn)](auto&&... elements) {
             return reverse::reduce(
@@ -646,7 +646,7 @@ constexpr auto transform_reduce(T init,
 template <typename T>
 constexpr auto transform_reduce(T init)
 {
-    return halg::detail::Partial_application_three{
+    return hal::detail::Partial_application_three{
         [init = std::move(init)](auto&& transform_fn, auto&& reduce_fn,
                                  auto&&... elements) {
             return reverse::transform_reduce(
@@ -659,7 +659,7 @@ constexpr auto transform_reduce(T init)
 template <typename T, typename UnaryOp>
 constexpr auto transform_reduce(T init, UnaryOp transform_fn)
 {
-    return halg::detail::Partial_application_two{
+    return hal::detail::Partial_application_two{
         [init = std::move(init), transform_fn = std::move(transform_fn)](
             auto&& reduce_fn, auto&&... elements) {
             return reverse::transform_reduce(
@@ -674,7 +674,7 @@ constexpr auto transform_reduce(T init,
                                 UnaryOp transform_fn,
                                 BinaryOp reduce_fn)
 {
-    return halg::detail::Partial_application_one{
+    return hal::detail::Partial_application_one{
         [init = std::move(init), transform_fn = std::move(transform_fn),
          reduce_fn = std::move(reduce_fn)](auto&&... elements) {
             return reverse::transform_reduce(
@@ -755,5 +755,5 @@ constexpr auto find(T x)
 /* -------------------------------------------------------------------------- */
 
 }  // namespace reverse
-}  // namespace halg
-#endif  // HALG_HPP
+}  // namespace hal
+#endif  // HAL_HPP

@@ -2,7 +2,7 @@
 
 #include <catch2/catch.hpp>
 
-#include <halg.hpp>
+#include <hal.hpp>
 
 namespace {
 constexpr auto sum         = [](auto x, auto y) { return x + y; };
@@ -11,56 +11,56 @@ constexpr auto logical_and = [](auto x, auto y) { return x && y; };
 constexpr auto logical_or  = [](auto x, auto y) { return x || y; };
 }  // namespace
 
-TEST_CASE("reduce", "[HALG]")
+TEST_CASE("reduce", "[HAL]")
 {
     SECTION("full call")
     {
-        auto a = halg::reduce(0., sum, 1, 'a', .5);
+        auto a = hal::reduce(0., sum, 1, 'a', .5);
         CHECK(a == 0. + 1 + 'a' + .5);
-        auto b = halg::reduce(true, logical_and, 1, true, (bool)nullptr);
+        auto b = hal::reduce(true, logical_and, 1, true, (bool)nullptr);
         CHECK(!b);
-        auto n = halg::reduce(true, logical_and, (bool)nullptr);
+        auto n = hal::reduce(true, logical_and, (bool)nullptr);
         CHECK(!n);
-        auto c = halg::reduce(false, logical_or, 1, true, (bool)nullptr);
+        auto c = hal::reduce(false, logical_or, 1, true, (bool)nullptr);
         CHECK(c);
-        auto d = halg::reduce(false, logical_or, true, true, true);
+        auto d = hal::reduce(false, logical_or, true, true, true);
         CHECK(d);
-        auto e = halg::reduce(false, logical_or, true);
+        auto e = hal::reduce(false, logical_or, true);
         CHECK(e);
-        auto f = halg::reduce(true, logical_and, true);
+        auto f = hal::reduce(true, logical_and, true);
         CHECK(f);
     }
     SECTION("partial application")
     {
-        auto empty_reduce = halg::reduce(0);
+        auto empty_reduce = hal::reduce(0);
         auto sum_reduce   = empty_reduce(sum);
         CHECK(sum_reduce(1, 2, 3, 4) == 10);
         CHECK(sum_reduce(1) == 1);
 
         CHECK(empty_reduce(sum, 1, 2, 3, 4) == 10);
 
-        auto product_reduce = halg::reduce(1, product);
+        auto product_reduce = hal::reduce(1, product);
         CHECK(product_reduce(4, 3, 2, 1) == 24);
 
         auto concat =
-            halg::reduce(std::string{}, [](auto x, auto y) { return x + y; });
+            hal::reduce(std::string{}, [](auto x, auto y) { return x + y; });
         CHECK(concat("Hello", ',', ' ', "World!") == "Hello, World!");
     }
     SECTION("constexpr")
     {
-        constexpr auto empty_reduce = halg::reduce(0);
+        constexpr auto empty_reduce = hal::reduce(0);
         constexpr auto sum_reduce   = empty_reduce(sum);
         static_assert(sum_reduce(1, 2, 3, 4) == 10);
         static_assert(sum_reduce(1) == 1);
 
-        constexpr auto product_reduce = halg::reduce(1, product);
+        constexpr auto product_reduce = hal::reduce(1, product);
         static_assert(product_reduce(4, 3, 2, 1) == 24);
     }
 }
 
-TEST_CASE("reverse::reduce", "[HALG]")
+TEST_CASE("reverse::reduce", "[HAL]")
 {
-    namespace hr = halg::reverse;
+    namespace hr = hal::reverse;
     SECTION("call ordering")
     {
         auto ss            = std::stringstream{};
