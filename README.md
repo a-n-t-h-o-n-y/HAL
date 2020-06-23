@@ -1,4 +1,4 @@
-# Heterogeneous Algorithms Library
+# Heterogeneous Algorithms Library(HAL)
 
 Provides a basic set of algorithms that will work over a variadic template of
 parameters, similar to how STL algorithms work over containers.

@@ -8,6 +8,7 @@ add_executable(tests
     count.test.cpp
     all_any_none_of.test.cpp
     get_first_last.test.cpp
+    find.test.cpp
 )
 
 target_link_libraries(tests
