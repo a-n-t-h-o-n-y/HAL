@@ -377,6 +377,7 @@ constexpr auto none(Elements&&... elements) -> bool
 }
 
 /* ----------------------- adjacent_transform_reduce ------------------------ */
+
 template <typename T,
           typename BinaryOp_1,
           typename BinaryOp_2,
@@ -392,13 +393,13 @@ constexpr auto adjacent_transform_reduce(T init,
 {
     auto transformed = transform_fn(std::forward<L>(left), right);
     auto reduced     = reduce_fn(std::move(init), std::move(transformed));
-    if constexpr (sizeof...(Tail) != 0) {
+    if constexpr (sizeof...(Tail) == 0)
+        return reduced;
+    else {
         return adjacent_transform_reduce(std::move(reduced), transform_fn,
                                          reduce_fn, right,
                                          std::forward<Tail>(tail)...);
     }
-    else
-        return reduced;
 }
 
 // Partial Application
@@ -439,6 +440,33 @@ constexpr auto adjacent_transform_reduce(T init,
             return adjacent_transform_reduce(
                 init, transform_fn, reduce_fn,
                 std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+/* --------------------------- adjacent_transform --------------------------- */
+template <typename BinaryOp, typename L, typename R, typename... Tail>
+constexpr void adjacent_transform(BinaryOp&& transform_fn,
+                                  L&& left,
+                                  R&& right,
+                                  Tail&&... tail)
+{
+    left = transform_fn(std::forward<L>(left), right);
+    if constexpr (sizeof...(Tail) == 0)
+        return;
+    else {
+        return adjacent_transform(transform_fn, right,
+                                  std::forward<Tail>(tail)...);
+    }
+}
+
+// Partial Application
+template <typename BinaryOp>
+constexpr auto adjacent_transform(BinaryOp transform_fn)
+{
+    return detail::Partial_application_three{
+        [transform_fn = std::move(transform_fn)](auto&&... elements) {
+            return adjacent_transform(
+                transform_fn, std::forward<decltype(elements)>(elements)...);
         }};
 }
 

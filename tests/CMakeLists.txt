@@ -10,6 +10,7 @@ add_executable(tests
     get_first_last.test.cpp
     find.test.cpp
     adjacent_transform_reduce.test.cpp
+    adjacent_transform.test.cpp
 )
 
 target_link_libraries(tests
