@@ -1,4 +1,3 @@
-#include <cctype>
 #include <functional>
 #include <sstream>
 
@@ -6,7 +5,6 @@
 
 #include <hal.hpp>
 
-// constexpr auto product = [](auto x, auto y) { return x * y; };
 constexpr auto sum = [](auto x, auto y) { return x + y; };
 TEST_CASE("adjacent_tranform", "[HAL]")
 {

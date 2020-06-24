@@ -11,6 +11,8 @@ add_executable(tests
     find.test.cpp
     adjacent_transform_reduce.test.cpp
     adjacent_transform.test.cpp
+    adjacent_difference.test.cpp
+    adjacent_find.test.cpp
 )
 
 target_link_libraries(tests

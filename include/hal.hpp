@@ -470,6 +470,28 @@ constexpr auto adjacent_transform(BinaryOp transform_fn)
         }};
 }
 
+/* -------------------------- adjacent_difference --------------------------- */
+template <typename... Elements>
+constexpr void adjacent_difference(Elements&&... elements)
+{
+    adjacent_transform([](auto const& l, auto const& r) { return r - l; },
+                       std::forward<Elements>(elements)...);
+}
+
+/* ----------------------------- adjacent_find ------------------------------ */
+
+template <typename... Elements>
+constexpr auto adjacent_find(Elements&&... elements) -> std::size_t
+{
+    auto increment_until_true = [still_going = true](std::size_t count,
+                                                     bool found) mutable {
+        return still_going && !found ? count + 1 : (still_going = false, count);
+    };
+    return adjacent_transform_reduce(0uL, std::equal_to<>{},
+                                     increment_until_true,
+                                     std::forward<Elements>(elements)...);
+}
+
 /* ---------------------------------- get ----------------------------------- */
 
 template <std::size_t I, typename... Elements>

@@ -15,6 +15,13 @@ TEST_CASE("for_each", "[HAL]")
 
         CHECK(ss.str() == "26.3 hello, world!-4320.5");
     }
+    SECTION("modifying")
+    {
+        [](auto... args) {
+            hal::for_each([](auto& x) { x = 1; }, args...);
+            hal::for_each([](auto x) { CHECK(x == 1); }, args...);
+        }(1, 5, 3);
+    }
 
     SECTION("partial application")
     {
