@@ -13,6 +13,7 @@ add_executable(tests
     adjacent_transform.test.cpp
     adjacent_difference.test.cpp
     adjacent_find.test.cpp
+    tuples.test.cpp
 )
 
 target_link_libraries(tests
