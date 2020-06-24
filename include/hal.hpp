@@ -376,6 +376,72 @@ constexpr auto none(Elements&&... elements) -> bool
     return none_of(detail::Identity{}, std::forward<Elements>(elements)...);
 }
 
+/* ----------------------- adjacent_transform_reduce ------------------------ */
+template <typename T,
+          typename BinaryOp_1,
+          typename BinaryOp_2,
+          typename L,
+          typename R,
+          typename... Tail>
+constexpr auto adjacent_transform_reduce(T init,
+                                         BinaryOp_1&& transform_fn,
+                                         BinaryOp_2&& reduce_fn,
+                                         L&& left,
+                                         R&& right,
+                                         Tail&&... tail) -> T
+{
+    auto transformed = transform_fn(std::forward<L>(left), right);
+    auto reduced     = reduce_fn(std::move(init), std::move(transformed));
+    if constexpr (sizeof...(Tail) != 0) {
+        return adjacent_transform_reduce(std::move(reduced), transform_fn,
+                                         reduce_fn, right,
+                                         std::forward<Tail>(tail)...);
+    }
+    else
+        return reduced;
+}
+
+// Partial Application
+template <typename T>
+constexpr auto adjacent_transform_reduce(T init)
+{
+    return detail::Partial_application_three{
+        [init = std::move(init)](auto&& transform_fn, auto&& reduce_fn,
+                                 auto&&... elements) {
+            return adjacent_transform_reduce(
+                init, std::forward<decltype(transform_fn)>(transform_fn),
+                std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename UnaryOp>
+constexpr auto adjacent_transform_reduce(T init, UnaryOp transform_fn)
+{
+    return detail::Partial_application_two{
+        [init = std::move(init), transform_fn = std::move(transform_fn)](
+            auto&& reduce_fn, auto&&... elements) {
+            return adjacent_transform_reduce(
+                init, transform_fn,
+                std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename UnaryOp, typename BinaryOp>
+constexpr auto adjacent_transform_reduce(T init,
+                                         UnaryOp transform_fn,
+                                         BinaryOp reduce_fn)
+{
+    return detail::Partial_application_one{
+        [init = std::move(init), transform_fn = std::move(transform_fn),
+         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
+            return adjacent_transform_reduce(
+                init, transform_fn, reduce_fn,
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
 /* ---------------------------------- get ----------------------------------- */
 
 template <std::size_t I, typename... Elements>
