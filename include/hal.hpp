@@ -138,6 +138,43 @@ constexpr auto reduce(T init, BinaryOp reduce_fn)
         }};
 }
 
+/* ---------------------------- partial_reduce ------------------------------ */
+template <typename T, typename BinaryOp, typename... Elements>
+constexpr void partial_reduce(T init,
+                              BinaryOp&& reduce_fn,
+                              Elements&&... elements)
+{
+    auto wrapped_reduce = [&reduce_fn](T const& sum, auto& element) constexpr
+    {
+        auto result = reduce_fn(sum, element);
+        element     = result;
+        return result;
+    };
+    reduce(init, wrapped_reduce, std::forward<Elements>(elements)...);
+}
+
+template <typename T>
+constexpr auto partial_reduce(T init)
+{
+    return detail::Partial_application_two{
+        [init = std::move(init)](auto&& reduce_fn, auto&&... elements) {
+            return partial_reduce(
+                init, std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename BinaryOp>
+constexpr auto partial_reduce(T init, BinaryOp reduce_fn)
+{
+    return detail::Partial_application_one{
+        [init      = std::move(init),
+         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
+            return partial_reduce(
+                init, reduce_fn, std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
 /* ------------------------------- transform -------------------------------- */
 template <typename UnaryOp, typename... Elements>
 constexpr auto transform(UnaryOp&& transform_fn, Elements&&... elements) -> void
@@ -376,18 +413,6 @@ constexpr auto none(Elements&&... elements) -> bool
     return none_of(detail::Identity{}, std::forward<Elements>(elements)...);
 }
 
-/* ------------------------------ partial_sum ------------------------------- */
-
-// TODO
-// template <typename... Elements>
-// constexpr void partial_sum(Elements&&... elements)
-// {
-//     reduce(init, [](auto const& sum, auto& element) {
-//         auto result = sum + element;
-//         element     = sum + element;
-//     });
-// }
-
 /* ----------------------- adjacent_transform_reduce ------------------------ */
 
 template <typename T,
@@ -531,6 +556,54 @@ template <typename... Elements>
 constexpr auto last(Elements&&... elements)
 {
     return get<sizeof...(Elements) - 1>(std::forward<Elements>(elements)...);
+}
+
+/* ------------------------------ partial_sum ------------------------------- */
+
+template <typename... Elements>
+constexpr void partial_sum(Elements&&... elements)
+{
+    if constexpr (sizeof...(Elements) == 0uL)
+        return;
+    using reduce_t = decltype(hal::first(std::forward<Elements>(elements)...));
+    partial_reduce(reduce_t(0),
+                   std::plus<>{})(std::forward<Elements>(elements)...);
+}
+
+/* -------------------------- partial_difference ---------------------------- */
+
+template <typename... Elements>
+constexpr void partial_difference(Elements&&... elements)
+{
+    if constexpr (sizeof...(Elements) == 0uL)
+        return;
+    using reduce_t = decltype(hal::first(std::forward<Elements>(elements)...));
+    partial_reduce(reduce_t(0),
+                   std::minus<>{})(std::forward<Elements>(elements)...);
+}
+
+/* --------------------------- partial_product ------------------------------ */
+
+template <typename... Elements>
+constexpr void partial_product(Elements&&... elements)
+{
+    if constexpr (sizeof...(Elements) == 0uL)
+        return;
+    using reduce_t = decltype(hal::first(std::forward<Elements>(elements)...));
+    partial_reduce(reduce_t(1),
+                   std::multiplies<>{})(std::forward<Elements>(elements)...);
+}
+
+/* --------------------------- partial_quotient ----------------------------- */
+
+template <typename... Elements>
+constexpr void partial_quotient(Elements&&... elements)
+{
+    if constexpr (sizeof...(Elements) == 0uL)
+        return;
+    using reduce_t = decltype(hal::first(std::forward<Elements>(elements)...));
+    partial_reduce(reduce_t(1),
+                   std::divides<>{})(std::forward<Elements>(elements)...);
 }
 
 namespace reverse {
