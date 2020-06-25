@@ -7,8 +7,8 @@
 #include <utility>
 
 namespace hal {
-namespace detail {
 
+namespace detail {
 /* ---------------------------Function Objects -------------------------------*/
 
 /// Function object returning given argument transparently.
@@ -375,6 +375,18 @@ constexpr auto none(Elements&&... elements) -> bool
 {
     return none_of(detail::Identity{}, std::forward<Elements>(elements)...);
 }
+
+/* ------------------------------ partial_sum ------------------------------- */
+
+// TODO
+// template <typename... Elements>
+// constexpr void partial_sum(Elements&&... elements)
+// {
+//     reduce(init, [](auto const& sum, auto& element) {
+//         auto result = sum + element;
+//         element     = sum + element;
+//     });
+// }
 
 /* ----------------------- adjacent_transform_reduce ------------------------ */
 
@@ -868,8 +880,127 @@ constexpr auto find(T x)
     };
 }
 
+}  // namespace reverse
+
+// to_tuple(...) from:
+// reddit.com/r/cpp/comments/4yp7fv/c17_structured_bindings_convert_struct_to_a_tuple
+/* ------------------------------ to_tuple ---------------------------------- */
+
+namespace detail {
+
+template <typename T, typename... Args>
+auto test_is_braces_constructible(int)
+    -> decltype(void(T{std::declval<Args>()...}), std::true_type{});
+
+template <typename...>
+auto test_is_braces_constructible(...) -> std::false_type;
+
+template <typename T, typename... Args>
+using is_braces_constructible =
+    decltype(test_is_braces_constructible<T, Args...>(0));
+
+template <typename T, typename... Args>
+using has_members = is_braces_constructible<T, Args...>;
+
+struct any_type {
+    template <typename T>
+    constexpr operator T();
+};
+}  // namespace detail
+
+template <typename T>
+constexpr auto to_tuple(T&& object)
+{
+    using namespace detail;
+    using obj_t = std::decay_t<T>;
+    using X     = any_type;
+    if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X, X, X, X,
+                              X, X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12, x13, x14,
+                x15] = std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11,
+                               x12, x13, x14, x15);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X, X, X,
+                                   X, X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12, x13,
+                x14] = std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11,
+                               x12, x13, x14);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X, X, X,
+                                   X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12, x13] =
+            std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11,
+                               x12, x13);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X, X,
+                                   X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12] =
+            std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11,
+                               x12);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X,
+                                   X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11] =
+            std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10,
+                               x11);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10] =
+            std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9] =
+            std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8] = std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5, x6, x7] = std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X, X, X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5, x6] = std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X, X>{}) {
+        auto&& [x0, x1, x2, x3, x4, X5] = std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4, X5);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X, X>{}) {
+        auto&& [x0, x1, x2, x3, x4] = std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3, x4);
+    }
+    else if constexpr (has_members<obj_t, X, X, X, X>{}) {
+        auto&& [x0, x1, x2, x3] = std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2, x3);
+    }
+    else if constexpr (has_members<obj_t, X, X, X>{}) {
+        auto&& [x0, x1, x2] = std::forward<T>(object);
+        return std::make_tuple(x0, x1, x2);
+    }
+    else if constexpr (has_members<obj_t, X, X>{}) {
+        auto&& [x0, x1] = std::forward<T>(object);
+        return std::make_tuple(x0, x1);
+    }
+    else if constexpr (has_members<obj_t, X>{}) {
+        auto&& [x0] = std::forward<T>(object);
+        return std::make_tuple(x0);
+    }
+    else {
+        return std::make_tuple();
+    }
+}
+
 /* -------------------------------------------------------------------------- */
 
-}  // namespace reverse
 }  // namespace hal
 #endif  // HAL_HPP
