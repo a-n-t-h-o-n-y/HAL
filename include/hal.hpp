@@ -146,8 +146,8 @@ constexpr void partial_reduce(T init,
 {
     auto wrapped_reduce = [&reduce_fn](T const& sum, auto& element) constexpr
     {
-        auto result = reduce_fn(sum, element);
-        element     = result;
+        auto const result = reduce_fn(sum, element);
+        element           = result;
         return result;
     };
     reduce(init, wrapped_reduce, std::forward<Elements>(elements)...);
@@ -785,6 +785,43 @@ constexpr auto reduce(T init, BinaryOp reduce_fn)
         }};
 }
 
+/* ----------------------- reverse::partial_reduce -------------------------- */
+template <typename T, typename BinaryOp, typename... Elements>
+constexpr void partial_reduce(T init,
+                              BinaryOp&& reduce_fn,
+                              Elements&&... elements)
+{
+    auto wrapped_reduce = [&reduce_fn](T const& sum, auto& element) constexpr
+    {
+        auto const result = reduce_fn(sum, element);
+        element           = result;
+        return result;
+    };
+    reverse::reduce(init, wrapped_reduce, std::forward<Elements>(elements)...);
+}
+
+template <typename T>
+constexpr auto partial_reduce(T init)
+{
+    return hal::detail::Partial_application_two{
+        [init = std::move(init)](auto&& reduce_fn, auto&&... elements) {
+            return reverse::partial_reduce(
+                init, std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename BinaryOp>
+constexpr auto partial_reduce(T init, BinaryOp reduce_fn)
+{
+    return hal::detail::Partial_application_one{
+        [init      = std::move(init),
+         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
+            return reverse::partial_reduce(
+                init, reduce_fn, std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
 /* -------------------------- reverse::transform ---------------------------- */
 
 template <typename UnaryOp, typename... Elements>
@@ -951,6 +988,55 @@ constexpr auto find(T x)
     return [x = std::move(x)](auto&&... elements) {
         return reverse::find(x, std::forward<decltype(elements)>(elements)...);
     };
+}
+
+/* ------------------------------ partial_sum ------------------------------- */
+
+template <typename... Elements>
+constexpr void partial_sum(Elements&&... elements)
+{
+    if constexpr (sizeof...(Elements) == 0uL)
+        return;
+    using reduce_t = decltype(hal::last(std::forward<Elements>(elements)...));
+    reverse::partial_reduce(reduce_t(0),
+                            std::plus<>{})(std::forward<Elements>(elements)...);
+}
+
+/* -------------------------- partial_difference ---------------------------- */
+
+template <typename... Elements>
+constexpr void partial_difference(Elements&&... elements)
+{
+    if constexpr (sizeof...(Elements) == 0uL)
+        return;
+    using reduce_t = decltype(hal::last(std::forward<Elements>(elements)...));
+    reverse::partial_reduce(
+        reduce_t(0), std::minus<>{})(std::forward<Elements>(elements)...);
+}
+
+/* --------------------------- partial_product ------------------------------ */
+
+template <typename... Elements>
+constexpr void partial_product(Elements&&... elements)
+{
+    if constexpr (sizeof...(Elements) == 0uL)
+        return;
+    using reduce_t = decltype(hal::last(std::forward<Elements>(elements)...));
+    reverse::partial_reduce(
+        reduce_t(1), std::multiplies<>{})(std::forward<Elements>(elements)...);
+}
+
+/* --------------------------- partial_quotient ----------------------------- */
+
+template <typename... Elements>
+constexpr void partial_quotient(Elements&&... elements)
+{
+    if constexpr (sizeof...(Elements) == 0uL)
+        return;
+    using reduce_t =
+    decltype(hal::last(std::forward<Elements>(elements)...));
+    reverse::partial_reduce(reduce_t(1),
+                   std::divides<>{})(std::forward<Elements>(elements)...);
 }
 
 }  // namespace reverse

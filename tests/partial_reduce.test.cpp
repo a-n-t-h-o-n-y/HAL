@@ -94,4 +94,88 @@ TEST_CASE("partial_reduce", "[HAL]")
             CHECK(hal::get<5>(xs...) == -694);
         }(1., 2., 3., -4., 0.000002, 30);
     }
+    SECTION("reverse::partial_reduce")
+    {
+        [](auto... xs) {
+            hal::reverse::partial_reduce(0, std::plus<>{}, xs...);
+            CHECK(hal::get<0>(xs...) == 7);
+            CHECK(hal::get<1>(xs...) == 6);
+            CHECK(hal::get<2>(xs...) == 4);
+            CHECK(hal::get<3>(xs...) == 1);
+            CHECK(hal::get<4>(xs...) == 5.2);
+            CHECK(hal::get<5>(xs...) == 2);
+        }(1, 2, 3, -4, 3.2, 2);
+    }
+    SECTION("partial application reverse::partial_reduce")
+    {
+        auto init_pr = hal::reverse::partial_reduce(0);
+        [&](auto... xs) {
+            init_pr(std::plus<>{}, xs...);
+            CHECK(hal::get<0>(xs...) == 7);
+            CHECK(hal::get<1>(xs...) == 6);
+            CHECK(hal::get<2>(xs...) == 4);
+            CHECK(hal::get<3>(xs...) == 1);
+            CHECK(hal::get<4>(xs...) == 5.2);
+            CHECK(hal::get<5>(xs...) == 2);
+        }(1, 2, 3, -4, 3.2, 2);
+
+        auto ps = hal::reverse::partial_reduce(0, std::plus<>{});
+        [&](auto... xs) {
+            ps(xs...);
+            CHECK(hal::get<0>(xs...) == 7);
+            CHECK(hal::get<1>(xs...) == 6);
+            CHECK(hal::get<2>(xs...) == 4);
+            CHECK(hal::get<3>(xs...) == 1);
+            CHECK(hal::get<4>(xs...) == 5.2);
+            CHECK(hal::get<5>(xs...) == 2);
+        }(1, 2, 3, -4, 3.2, 2);
+    }
+    SECTION("reverse::partial_sum")
+    {
+        [&](auto... xs) {
+            hal::reverse::partial_sum(xs...);
+            CHECK(hal::get<0>(xs...) == 7);
+            CHECK(hal::get<1>(xs...) == 6);
+            CHECK(hal::get<2>(xs...) == 4);
+            CHECK(hal::get<3>(xs...) == 1);
+            CHECK(hal::get<4>(xs...) == 5.2);
+            CHECK(hal::get<5>(xs...) == 2);
+        }(1, 2, 3, -4, 3.2, 2);
+    }
+    SECTION("reverse::partial_difference")
+    {
+        [&](auto... xs) {
+            hal::reverse::partial_difference(xs...);
+            CHECK(hal::get<0>(xs...) == -7);
+            CHECK(hal::get<1>(xs...) == -6);
+            CHECK(hal::get<2>(xs...) == -4);
+            CHECK(hal::get<3>(xs...) == -1);
+            CHECK(hal::get<4>(xs...) == -5.2);
+            CHECK(hal::get<5>(xs...) == -2);
+        }(1, 2, 3, -4, 3.2, 2);
+    }
+    SECTION("reverse::partial_product")
+    {
+        [&](auto... xs) {
+            hal::reverse::partial_product(xs...);
+            CHECK(hal::get<0>(xs...) == -144);
+            CHECK(hal::get<1>(xs...) == -144);
+            CHECK(hal::get<2>(xs...) == -72);
+            CHECK(hal::get<3>(xs...) == -24);
+            CHECK(hal::get<4>(xs...) == 2 * 3.2);
+            CHECK(hal::get<5>(xs...) == 2);
+        }(1, 2, 3, -4, 3.2, 2);
+    }
+    SECTION("reverse::partial_quotient")
+    {
+        [&](auto... xs) {
+            hal::reverse::partial_quotient(xs...);
+            CHECK(hal::get<0>(xs...) == ((((1 / 30.) / .000002) / -4) / 3) / 2);
+            CHECK(hal::get<1>(xs...) == ((((1 / 30.) / .000002) / -4) / 3) / 2);
+            CHECK(hal::get<2>(xs...) == (((1 / 30.) / .000002) / -4) / 3);
+            CHECK(hal::get<3>(xs...) == ((1 / 30.) / .000002) / -4);
+            CHECK(hal::get<4>(xs...) == (1 / 30.) / .000002);
+            CHECK(hal::get<5>(xs...) == 1 / 30.);
+        }(1., 2., 3., -4., 0.000002, 30.);
+    }
 }
