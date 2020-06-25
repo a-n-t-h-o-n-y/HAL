@@ -3,6 +3,8 @@
 Provides a basic set of algorithms that will work over a variadic template of
 parameters, similar to how STL algorithms work over containers.
 
+[Documentation](docs/toc.md)
+
 ## The Algorithms
 
 - Takes algorithm specific parameters first, then the parameter pack.
