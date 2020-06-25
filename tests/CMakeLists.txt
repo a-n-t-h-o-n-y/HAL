@@ -14,7 +14,6 @@ add_executable(tests
     adjacent_difference.test.cpp
     adjacent_find.test.cpp
     tuples.test.cpp
-    to_tuple.test.cpp
     partial_reduce.test.cpp
 )
 

@@ -1033,10 +1033,9 @@ constexpr void partial_quotient(Elements&&... elements)
 {
     if constexpr (sizeof...(Elements) == 0uL)
         return;
-    using reduce_t =
-    decltype(hal::last(std::forward<Elements>(elements)...));
-    reverse::partial_reduce(reduce_t(1),
-                   std::divides<>{})(std::forward<Elements>(elements)...);
+    using reduce_t = decltype(hal::last(std::forward<Elements>(elements)...));
+    reverse::partial_reduce(
+        reduce_t(1), std::divides<>{})(std::forward<Elements>(elements)...);
 }
 
 }  // namespace reverse
@@ -1157,6 +1156,27 @@ constexpr auto to_tuple(T&& object)
     else {
         return std::make_tuple();
     }
+}
+
+// Modified from:
+// cppreference.com/w/cpp/utility/make_from_tuple
+/* -------------------------- make_from_tuple ------------------------------- */
+namespace detail {
+template <typename T, typename Tuple, std::size_t... I>
+constexpr auto from_tuple_impl(Tuple&& t, std::index_sequence<I...>) -> T
+{
+    return T{std::get<I>(std::forward<Tuple>(t))...};
+}
+}  // namespace detail
+
+// Uses braces instead of parentheses to construct, for working with structs
+template <typename T, typename Tuple>
+constexpr auto from_tuple(Tuple&& t) -> T
+{
+    return detail::from_tuple_impl<T>(
+        std::forward<Tuple>(t),
+        std::make_index_sequence<
+            std::tuple_size_v<std::remove_reference_t<Tuple>>>{});
 }
 
 /* -------------------------------------------------------------------------- */
