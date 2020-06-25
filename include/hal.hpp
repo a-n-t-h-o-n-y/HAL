@@ -150,7 +150,8 @@ constexpr void partial_reduce(T init,
         element           = result;
         return result;
     };
-    reduce(init, wrapped_reduce, std::forward<Elements>(elements)...);
+    reduce(std::move(init), wrapped_reduce,
+           std::forward<Elements>(elements)...);
 }
 
 template <typename T>
@@ -238,6 +239,58 @@ constexpr auto transform_reduce(T init,
         [init = std::move(init), transform_fn = std::move(transform_fn),
          reduce_fn = std::move(reduce_fn)](auto&&... elements) {
             return transform_reduce(
+                init, transform_fn, reduce_fn,
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+/* ------------------------ partial_transform_reduce ------------------------ */
+template <typename T, typename UnaryOp, typename BinaryOp, typename... Elements>
+constexpr void partial_transform_reduce(T init,
+                                        UnaryOp&& transform_fn,
+                                        BinaryOp&& reduce_fn,
+                                        Elements&&... elements)
+{
+    ((std::forward<Elements>(elements) = init =
+          reduce_fn(init, transform_fn(std::forward<Elements>(elements)))),
+     ...);
+}
+
+template <typename T>
+constexpr auto partial_transform_reduce(T init)
+{
+    return detail::Partial_application_three{
+        [init = std::move(init)](auto&& transform_fn, auto&& reduce_fn,
+                                 auto&&... elements) {
+            return partial_transform_reduce(
+                init, std::forward<decltype(transform_fn)>(transform_fn),
+                std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename UnaryOp>
+constexpr auto partial_transform_reduce(T init, UnaryOp transform_fn)
+{
+    return detail::Partial_application_two{
+        [init = std::move(init), transform_fn = std::move(transform_fn)](
+            auto&& reduce_fn, auto&&... elements) {
+            return partial_transform_reduce(
+                init, transform_fn,
+                std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename UnaryOp, typename BinaryOp>
+constexpr auto partial_transform_reduce(T init,
+                                        UnaryOp transform_fn,
+                                        BinaryOp reduce_fn)
+{
+    return detail::Partial_application_one{
+        [init = std::move(init), transform_fn = std::move(transform_fn),
+         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
+            return partial_transform_reduce(
                 init, transform_fn, reduce_fn,
                 std::forward<decltype(elements)>(elements)...);
         }};
@@ -916,6 +969,89 @@ constexpr auto transform_reduce(T init,
         [init = std::move(init), transform_fn = std::move(transform_fn),
          reduce_fn = std::move(reduce_fn)](auto&&... elements) {
             return reverse::transform_reduce(
+                init, transform_fn, reduce_fn,
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+/* ------------------- reverse::partial_transform_reduce -------------------- */
+namespace detail {
+
+template <typename T, typename UnaryOp, typename BinaryOp>
+constexpr auto partial_transform_reduce_impl(T init, UnaryOp&&, BinaryOp &&)
+    -> T
+{
+    return init;
+}
+
+// Base case of zero elements is ambiguous with partial application, new name.
+template <typename T,
+          typename UnaryOp,
+          typename BinaryOp,
+          typename Head,
+          typename... Tail>
+constexpr auto partial_transform_reduce_impl(T init,
+                                             UnaryOp&& transform_fn,
+                                             BinaryOp&& reduce_fn,
+                                             Head&& head,
+                                             Tail&&... tail) -> T
+{
+    auto tail_result = partial_transform_reduce_impl(
+        std::move(init), transform_fn, reduce_fn, std::forward<Tail>(tail)...);
+    auto head_result = transform_fn(head);
+    std::forward<Head>(head) =
+        reduce_fn(std::move(tail_result), std::move(head_result));
+    return head;
+}
+
+}  // namespace detail
+
+template <typename T, typename UnaryOp, typename BinaryOp, typename... Elements>
+constexpr void partial_transform_reduce(T init,
+                                        UnaryOp&& transform_fn,
+                                        BinaryOp&& reduce_fn,
+                                        Elements&&... elements)
+{
+    detail::partial_transform_reduce_impl(
+        std::move(init), std::forward<UnaryOp>(transform_fn),
+        std::forward<BinaryOp>(reduce_fn), std::forward<Elements>(elements)...);
+}
+
+template <typename T>
+constexpr auto partial_transform_reduce(T init)
+{
+    return hal::detail::Partial_application_three{
+        [init = std::move(init)](auto&& transform_fn, auto&& reduce_fn,
+                                 auto&&... elements) {
+            return reverse::partial_transform_reduce(
+                init, std::forward<decltype(transform_fn)>(transform_fn),
+                std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename UnaryOp>
+constexpr auto partial_transform_reduce(T init, UnaryOp transform_fn)
+{
+    return hal::detail::Partial_application_two{
+        [init = std::move(init), transform_fn = std::move(transform_fn)](
+            auto&& reduce_fn, auto&&... elements) {
+            return reverse::partial_transform_reduce(
+                init, transform_fn,
+                std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(elements)>(elements)...);
+        }};
+}
+
+template <typename T, typename UnaryOp, typename BinaryOp>
+constexpr auto partial_transform_reduce(T init,
+                                        UnaryOp transform_fn,
+                                        BinaryOp reduce_fn)
+{
+    return hal::detail::Partial_application_one{
+        [init = std::move(init), transform_fn = std::move(transform_fn),
+         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
+            return reverse::partial_transform_reduce(
                 init, transform_fn, reduce_fn,
                 std::forward<decltype(elements)>(elements)...);
         }};

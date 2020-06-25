@@ -15,6 +15,7 @@ add_executable(tests
     adjacent_find.test.cpp
     tuples.test.cpp
     partial_reduce.test.cpp
+    partial_transform_reduce.test.cpp
 )
 
 target_link_libraries(tests
