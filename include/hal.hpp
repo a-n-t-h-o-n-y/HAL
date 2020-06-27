@@ -297,8 +297,9 @@ constexpr auto partial_transform_reduce(T init,
 }
 
 /* -------------------------------- find_if --------------------------------- */
-template <typename UnaryOp, typename... Pack>
-constexpr auto find_if(UnaryOp&& predicate, Pack&&... elements) -> std::size_t
+template <typename UnaryOp, typename... Elements>
+constexpr auto find_if(UnaryOp&& predicate, Elements&&... elements)
+    -> std::size_t
 {
     auto increment_until_true = [still_going = true](std::size_t count,
                                                      auto boolean) mutable {
@@ -307,7 +308,7 @@ constexpr auto find_if(UnaryOp&& predicate, Pack&&... elements) -> std::size_t
     };
     return transform_reduce(0uL, std::forward<UnaryOp>(predicate),
                             increment_until_true,
-                            std::forward<Pack>(elements)...);
+                            std::forward<Elements>(elements)...);
 }
 
 template <typename UnaryOp>
@@ -321,8 +322,8 @@ constexpr auto find_if(UnaryOp predicate)
 
 /* ------------------------------ find_if_not ------------------------------- */
 
-template <typename UnaryOp, typename... Pack>
-constexpr auto find_if_not(UnaryOp&& predicate, Pack&&... elements)
+template <typename UnaryOp, typename... Elements>
+constexpr auto find_if_not(UnaryOp&& predicate, Elements&&... elements)
     -> std::size_t
 {
     // std::not_fn is not constexpr, can't put this in its own function, not
@@ -333,7 +334,7 @@ constexpr auto find_if_not(UnaryOp&& predicate, Pack&&... elements)
         };
     };
     return find_if(not_fn(std::forward<UnaryOp>(predicate)),
-                   std::forward<Pack>(elements)...);
+                   std::forward<Elements>(elements)...);
 }
 
 template <typename UnaryOp>
@@ -347,11 +348,11 @@ constexpr auto find_if_not(UnaryOp&& predicate)
 
 /* --------------------------------- find ----------------------------------- */
 
-template <typename T, typename... Pack>
-constexpr auto find(T&& x, Pack&&... elements) -> std::size_t
+template <typename T, typename... Elements>
+constexpr auto find(T&& x, Elements&&... elements) -> std::size_t
 {
     auto equal_to_x = [&](auto y) { return y == x; };
-    return find_if(equal_to_x, std::forward<Pack>(elements)...);
+    return find_if(equal_to_x, std::forward<Elements>(elements)...);
 }
 
 template <typename T>
@@ -585,30 +586,29 @@ constexpr auto adjacent_find(Elements&&... elements) -> std::size_t
 /* ---------------------------------- get ----------------------------------- */
 
 template <std::size_t I, typename... Elements>
-constexpr auto get(Elements&&... elements)
+constexpr auto get(Elements&&... elements) -> decltype(auto)
 {
-    if constexpr (sizeof...(Elements) == 0)
-        return;
-    else {
-        return std::get<I>(
-            std::forward_as_tuple(std::forward<Elements>(elements)...));
-    }
+    static_assert(I < sizeof...(Elements),
+                  "Cannot access elements outside of parameter pack");
+    return std::get<I>(
+        std::forward_as_tuple(std::forward<Elements>(elements)...));
 }
 
 /* --------------------------------- first ---------------------------------- */
 
 template <typename... Elements>
-constexpr auto first(Elements&&... elements)
+constexpr auto first(Elements&&... elements) -> decltype(auto)
 {
-    return get<0>(std::forward<Elements>(elements)...);
+    return hal::get<0>(std::forward<Elements>(elements)...);
 }
 
 /* --------------------------------- last ----------------------------------- */
 
 template <typename... Elements>
-constexpr auto last(Elements&&... elements)
+constexpr auto last(Elements&&... elements) -> decltype(auto)
 {
-    return get<sizeof...(Elements) - 1>(std::forward<Elements>(elements)...);
+    return hal::get<sizeof...(Elements) - 1>(
+        std::forward<Elements>(elements)...);
 }
 
 /* ------------------------------ partial_sum ------------------------------- */
@@ -618,7 +618,8 @@ constexpr void partial_sum(Elements&&... elements)
 {
     if constexpr (sizeof...(Elements) == 0uL)
         return;
-    using reduce_t = decltype(hal::first(std::forward<Elements>(elements)...));
+    using reduce_t =
+        std::decay_t<decltype(hal::first(std::forward<Elements>(elements)...))>;
     partial_reduce(reduce_t(0),
                    std::plus<>{})(std::forward<Elements>(elements)...);
 }
@@ -630,7 +631,8 @@ constexpr void partial_difference(Elements&&... elements)
 {
     if constexpr (sizeof...(Elements) == 0uL)
         return;
-    using reduce_t = decltype(hal::first(std::forward<Elements>(elements)...));
+    using reduce_t =
+        std::decay_t<decltype(hal::first(std::forward<Elements>(elements)...))>;
     partial_reduce(reduce_t(0),
                    std::minus<>{})(std::forward<Elements>(elements)...);
 }
@@ -642,7 +644,8 @@ constexpr void partial_product(Elements&&... elements)
 {
     if constexpr (sizeof...(Elements) == 0uL)
         return;
-    using reduce_t = decltype(hal::first(std::forward<Elements>(elements)...));
+    using reduce_t =
+        std::decay_t<decltype(hal::first(std::forward<Elements>(elements)...))>;
     partial_reduce(reduce_t(1),
                    std::multiplies<>{})(std::forward<Elements>(elements)...);
 }
@@ -654,7 +657,8 @@ constexpr void partial_quotient(Elements&&... elements)
 {
     if constexpr (sizeof...(Elements) == 0uL)
         return;
-    using reduce_t = decltype(hal::first(std::forward<Elements>(elements)...));
+    using reduce_t =
+        std::decay_t<decltype(hal::first(std::forward<Elements>(elements)...))>;
     partial_reduce(reduce_t(1),
                    std::divides<>{})(std::forward<Elements>(elements)...);
 }
@@ -1059,8 +1063,9 @@ constexpr auto partial_transform_reduce(T init,
 
 /* --------------------------- reverse::find_if ----------------------------- */
 
-template <typename UnaryOp, typename... Pack>
-constexpr auto find_if(UnaryOp&& predicate, Pack&&... elements) -> std::size_t
+template <typename UnaryOp, typename... Elements>
+constexpr auto find_if(UnaryOp&& predicate, Elements&&... elements)
+    -> std::size_t
 {
     auto decrement_until_true =
         [still_going = true](std::size_t count, bool predicate_result) mutable {
@@ -1070,10 +1075,10 @@ constexpr auto find_if(UnaryOp&& predicate, Pack&&... elements) -> std::size_t
         };
 
     auto const result = reverse::transform_reduce(
-        sizeof...(Pack) - 1, std::forward<UnaryOp>(predicate),
-        decrement_until_true, std::forward<Pack>(elements)...);
+        sizeof...(Elements) - 1, std::forward<UnaryOp>(predicate),
+        decrement_until_true, std::forward<Elements>(elements)...);
 
-    return result == -1uL ? sizeof...(Pack) : result;
+    return result == -1uL ? sizeof...(Elements) : result;
 }
 
 template <typename UnaryOp>
@@ -1087,8 +1092,8 @@ constexpr auto find_if(UnaryOp predicate)
 
 /* ------------------------- reverse::find_if_not --------------------------- */
 
-template <typename UnaryOp, typename... Pack>
-constexpr auto find_if_not(UnaryOp&& predicate, Pack&&... elements)
+template <typename UnaryOp, typename... Elements>
+constexpr auto find_if_not(UnaryOp&& predicate, Elements&&... elements)
     -> std::size_t
 {
     constexpr auto not_fn = [](auto&& f) {
@@ -1097,7 +1102,7 @@ constexpr auto find_if_not(UnaryOp&& predicate, Pack&&... elements)
         };
     };
     return reverse::find_if(not_fn(std::forward<UnaryOp>(predicate)),
-                            std::forward<Pack>(elements)...);
+                            std::forward<Elements>(elements)...);
 }
 
 template <typename UnaryOp>
@@ -1111,11 +1116,11 @@ constexpr auto find_if_not(UnaryOp predicate)
 
 /* ---------------------------- reverse::find ------------------------------- */
 
-template <typename T, typename... Pack>
-constexpr auto find(T&& x, Pack&&... elements) -> std::size_t
+template <typename T, typename... Elements>
+constexpr auto find(T&& x, Elements&&... elements) -> std::size_t
 {
     auto equal_to_x = [&](auto y) { return y == x; };
-    return reverse::find_if(equal_to_x, std::forward<Pack>(elements)...);
+    return reverse::find_if(equal_to_x, std::forward<Elements>(elements)...);
 }
 
 template <typename T>
@@ -1126,50 +1131,54 @@ constexpr auto find(T x)
     };
 }
 
-/* ------------------------------ partial_sum ------------------------------- */
+/* ------------------------- reverse::partial_sum --------------------------- */
 
 template <typename... Elements>
 constexpr void partial_sum(Elements&&... elements)
 {
     if constexpr (sizeof...(Elements) == 0uL)
         return;
-    using reduce_t = decltype(hal::last(std::forward<Elements>(elements)...));
+    using reduce_t =
+        std::decay_t<decltype(hal::last(std::forward<Elements>(elements)...))>;
     reverse::partial_reduce(reduce_t(0),
                             std::plus<>{})(std::forward<Elements>(elements)...);
 }
 
-/* -------------------------- partial_difference ---------------------------- */
+/* --------------------- reverse::partial_difference ------------------------ */
 
 template <typename... Elements>
 constexpr void partial_difference(Elements&&... elements)
 {
     if constexpr (sizeof...(Elements) == 0uL)
         return;
-    using reduce_t = decltype(hal::last(std::forward<Elements>(elements)...));
+    using reduce_t =
+        std::decay_t<decltype(hal::last(std::forward<Elements>(elements)...))>;
     reverse::partial_reduce(
         reduce_t(0), std::minus<>{})(std::forward<Elements>(elements)...);
 }
 
-/* --------------------------- partial_product ------------------------------ */
+/* ---------------------- reverse::partial_product -------------------------- */
 
 template <typename... Elements>
 constexpr void partial_product(Elements&&... elements)
 {
     if constexpr (sizeof...(Elements) == 0uL)
         return;
-    using reduce_t = decltype(hal::last(std::forward<Elements>(elements)...));
+    using reduce_t =
+        std::decay_t<decltype(hal::last(std::forward<Elements>(elements)...))>;
     reverse::partial_reduce(
         reduce_t(1), std::multiplies<>{})(std::forward<Elements>(elements)...);
 }
 
-/* --------------------------- partial_quotient ----------------------------- */
+/* ---------------------- reverse::partial_quotient ------------------------- */
 
 template <typename... Elements>
 constexpr void partial_quotient(Elements&&... elements)
 {
     if constexpr (sizeof...(Elements) == 0uL)
         return;
-    using reduce_t = decltype(hal::last(std::forward<Elements>(elements)...));
+    using reduce_t =
+        std::decay_t<decltype(hal::last(std::forward<Elements>(elements)...))>;
     reverse::partial_reduce(
         reduce_t(1), std::divides<>{})(std::forward<Elements>(elements)...);
 }
