@@ -18,3 +18,5 @@ type in the pack, the correct overload will be applied for each element.
 :heavy_check_mark: `hal::reverse::transform(...)`
 
 :heavy_check_mark: Modifying Algorithm
+
+[Examples](../tests/transform.test.cpp)

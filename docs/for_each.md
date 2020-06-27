@@ -18,3 +18,5 @@ with `f`, taking a non-const reference.
 :heavy_check_mark: `hal::reverse::for_each(...)`
 
 :x: Modifying Algorithm
+
+[Examples](../tests/for_each.test.cpp)

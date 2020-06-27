@@ -26,3 +26,5 @@ reference.
 :heavy_check_mark: `hal::reverse::transform_reduce(...)`
 
 :x: Modifying Algorithm
+
+[Examples](../tests/transform_reduce.test.cpp)

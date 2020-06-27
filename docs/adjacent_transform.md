@@ -15,3 +15,5 @@ be assigned to the first parameter type.
 :x: `hal::reverse::adjacent_transform(...)`
 
 :heavy_check_mark: Modifying Algorithm
+
+[Examples](../tests/adjacent_transform.test.cpp)

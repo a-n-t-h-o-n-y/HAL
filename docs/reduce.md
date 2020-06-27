@@ -18,3 +18,5 @@ type of element passed in.
 :heavy_check_mark: `hal::reverse::reduce(...)`
 
 :x: Modifying Algorithm
+
+[Examples](../tests/reduce.test.cpp)

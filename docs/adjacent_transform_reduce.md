@@ -30,3 +30,5 @@ See also [transform_reduce](transform_reduce.md).
 :x: `hal::reverse::adjacent_transform_reduce(...)`
 
 :x: Modifying Algorithm
+
+[Examples](../tests/adjacent_transform_reduce.test.cpp)

@@ -2,7 +2,7 @@
 
 1. [Overview](overview.md)
 2. [Partial Application](partial_application.md)
-3. [Tuples](tuples.md)
+3. [Tuples and Structs](tuples_structs.md)
 
 ## Non-Modifying Algorithms
 

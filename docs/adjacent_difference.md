@@ -15,3 +15,5 @@ first element of the pair. The last element in the pack remains unmodified.
 :x: `hal::reverse::adjacent_difference(...)`
 
 :heavy_check_mark: Modifying Algorithm
+
+[Examples](../tests/adjacent_difference.test.cpp)

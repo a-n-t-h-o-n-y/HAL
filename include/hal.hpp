@@ -1209,10 +1209,9 @@ struct any_type {
     template <typename T>
     constexpr operator T();
 };
-}  // namespace detail
 
-template <typename T>
-constexpr auto to_tuple(T&& object)
+template <typename Make_tup, typename T>
+constexpr auto to_tuple_impl(Make_tup&& make_tup, T&& object)
 {
     using namespace detail;
     using obj_t = std::decay_t<T>;
@@ -1221,91 +1220,108 @@ constexpr auto to_tuple(T&& object)
                               X, X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12, x13, x14,
                 x15] = std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11,
-                               x12, x13, x14, x15);
+        return make_tup(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12,
+                        x13, x14, x15);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X, X, X,
                                    X, X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12, x13,
                 x14] = std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11,
-                               x12, x13, x14);
+        return make_tup(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12,
+                        x13, x14);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X, X, X,
                                    X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12, x13] =
             std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11,
-                               x12, x13);
+        return make_tup(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12,
+                        x13);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X, X,
                                    X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12] =
             std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11,
-                               x12);
+        return make_tup(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11, x12);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X,
                                    X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11] =
             std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10,
-                               x11);
+        return make_tup(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10, x11);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X, X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10] =
             std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10);
+        return make_tup(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9, x10);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X, X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8, x9] =
             std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9);
+        return make_tup(x0, x1, x2, x3, x4, X5, x6, x7, x8, x9);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X, X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5, x6, x7, x8] = std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7, x8);
+        return make_tup(x0, x1, x2, x3, x4, X5, x6, x7, x8);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X, X, X, X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5, x6, x7] = std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6, x7);
+        return make_tup(x0, x1, x2, x3, x4, X5, x6, x7);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X, X, X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5, x6] = std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5, x6);
+        return make_tup(x0, x1, x2, x3, x4, X5, x6);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X, X>{}) {
         auto&& [x0, x1, x2, x3, x4, X5] = std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4, X5);
+        return make_tup(x0, x1, x2, x3, x4, X5);
     }
     else if constexpr (has_members<obj_t, X, X, X, X, X>{}) {
         auto&& [x0, x1, x2, x3, x4] = std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3, x4);
+        return make_tup(x0, x1, x2, x3, x4);
     }
     else if constexpr (has_members<obj_t, X, X, X, X>{}) {
         auto&& [x0, x1, x2, x3] = std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2, x3);
+        return make_tup(x0, x1, x2, x3);
     }
     else if constexpr (has_members<obj_t, X, X, X>{}) {
         auto&& [x0, x1, x2] = std::forward<T>(object);
-        return std::make_tuple(x0, x1, x2);
+        return make_tup(x0, x1, x2);
     }
     else if constexpr (has_members<obj_t, X, X>{}) {
         auto&& [x0, x1] = std::forward<T>(object);
-        return std::make_tuple(x0, x1);
+        return make_tup(x0, x1);
     }
     else if constexpr (has_members<obj_t, X>{}) {
         auto&& [x0] = std::forward<T>(object);
-        return std::make_tuple(x0);
+        return make_tup(x0);
     }
     else {
-        return std::make_tuple();
+        return make_tup();
     }
+}
+}  // namespace detail
+
+template <typename T>
+constexpr auto to_tuple(T&& object)
+{
+    return detail::to_tuple_impl(
+        [](auto&&... x) {
+            return std::make_tuple(std::forward<decltype(x)>(x)...);
+        },
+        std::forward<T>(object));
+}
+
+template <typename T>
+constexpr auto to_ref_tuple(T&& object)
+{
+    return detail::to_tuple_impl(
+        [](auto&&... x) { return std::tie(std::forward<decltype(x)>(x)...); },
+        std::forward<T>(object));
 }
 
 // Modified from:
 // cppreference.com/w/cpp/utility/make_from_tuple
-/* -------------------------- make_from_tuple ------------------------------- */
+/* ---------------------------- from_tuple ---------------------------------- */
 namespace detail {
 template <typename T, typename Tuple, std::size_t... I>
 constexpr auto from_tuple_impl(Tuple&& t, std::index_sequence<I...>) -> T
@@ -1325,6 +1341,15 @@ constexpr auto from_tuple(Tuple&& t) -> T
 }
 
 /* -------------------------------------------------------------------------- */
+
+// TODO?
+// Partial Application?
+template <typename UnaryOp, typename T>
+constexpr auto struct_for_each(UnaryOp&& func, T&& aggregate) -> void
+{
+    return std::apply(hal::for_each(std::forward<UnaryOp>(func)),
+                      hal::to_ref_tuple(std::forward<T>(aggregate)));
+}
 
 }  // namespace hal
 #endif  // HAL_HPP

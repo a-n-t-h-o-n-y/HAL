@@ -100,6 +100,30 @@ TEST_CASE("tuple", "[HAL]")
             CHECK(std::get<15>(t) == 15);
         }
     }
+    SECTION("to_ref_tuple")
+    {
+        struct Foo {
+            int a    = 34;
+            char b   = '#';  // 35
+            double c = 7.432;
+        };
+        SECTION("general")
+        {
+            auto a = Foo{};
+            auto t = hal::to_ref_tuple(a);
+            std::apply(
+                [](auto&&... x) {
+                    hal::partial_sum(std::forward<decltype(x)>(x)...);
+                },
+                t);
+            CHECK(std::get<0>(t) == 34);
+            CHECK(std::get<1>(t) == 'E');
+            CHECK(std::get<2>(t) == 76.432);
+            CHECK(a.a == 34);
+            CHECK(a.b == 'E');
+            CHECK(a.c == 76.432);
+        }
+    }
     SECTION("algorithm on struct members")
     {
         struct Baz {

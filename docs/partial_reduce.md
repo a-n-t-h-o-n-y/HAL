@@ -75,3 +75,5 @@ void partial_quotient(Elements&&... elements)
 :heavy_check_mark: `hal::reverse::partial_quotient(...)`
 
 :heavy_check_mark: Modifying Algorithm
+
+[Examples](../tests/partial_reduce.test.cpp)

@@ -81,3 +81,5 @@ bool none(Elements&&... elements);
 :heavy_check_mark: `hal::reverse::none(...)`
 
 :x: Modifying Algorithm
+
+[Examples](../tests/all_any_none_of.test.cpp)

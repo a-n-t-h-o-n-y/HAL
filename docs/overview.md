@@ -1,5 +1,9 @@
 # HAL Overview
 
+#include <hal.hpp>
+
+namespaces `hal::` and `hal::reverse::`
+
 non-mutating means the function does not assign over any of the elements in the
 pack itself.
 

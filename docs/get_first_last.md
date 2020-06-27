@@ -45,3 +45,5 @@ Returns a reference(l or r value) to the last element. Will fail to compile if
 :x: `hal::reverse::last(...)`
 
 :x: Modifying Algorithm
+
+[Examples](../tests/get_first_last.test.cpp)

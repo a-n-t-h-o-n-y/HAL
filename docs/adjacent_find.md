@@ -15,3 +15,5 @@ adjacent elements.
 :x: `hal::reverse::adjacent_find(...)`
 
 :x: Modifying Algorithm
+
+[Examples](../tests/adjacent_find.test.cpp)

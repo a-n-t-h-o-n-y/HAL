@@ -28,3 +28,5 @@ Each type in the parameter pack needs to be assignable from a `T`.
 :heavy_check_mark: `hal::reverse::partial_transform_reduce(...)`
 
 :heavy_check_mark: Modifying Algorithm
+
+[Examples](../tests/partial_transform_reduce.test.cpp)

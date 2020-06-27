@@ -29,3 +29,5 @@ convertible to bool. Returns the count as an unsigned value.
 :x: `hal::reverse::count(...)`
 
 :x: Modifying Algorithm
+
+[Examples](../tests/count.test.cpp)

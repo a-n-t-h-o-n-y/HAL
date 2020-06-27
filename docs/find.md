@@ -49,3 +49,5 @@ will return `sizeof...(Elements...)` if no match is found.
 :heavy_check_mark: `hal::reverse::find(...)`
 
 :x: Modifying Algorithm
+
+[Examples](../tests/find.test.cpp)
