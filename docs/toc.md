@@ -1,9 +1,3 @@
-# Table of Contents
-
-1. [Overview](overview.md)
-2. [Partial Application](partial_application.md)
-3. [Tuples and Structs](tuples_structs.md)
-
 ## Non-Modifying Algorithms
 
 1. [`for_each`](for_each.md)
@@ -22,3 +16,8 @@
 3. [`partial_transform_reduce`](partial_transform_reduce.md)
 4. [`adjacent_difference`](adjacent_difference.md)
 5. [`adjacent_transform`](adjacent_transform.md)
+
+## Resources
+1. [Overview](overview.md)
+2. [Partial Application](partial_application.md)
+3. [Tuples and Structs](tuples_structs.md)

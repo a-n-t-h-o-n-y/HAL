@@ -1,61 +1,53 @@
-# Heterogeneous Algorithms Library (HAL)
+# Heterogeneous Algorithm Library (HAL)
 
-Provides a basic set of algorithms that will work over a variadic template of
-parameters, similar to how STL algorithms work over containers.
-
-[Documentation](docs/toc.md)
-
-## The Algorithms
-
-- Takes algorithm specific parameters first, then the parameter pack.
-- Implements partial function application, all parameters not part of the pack
-  can be bound by calling the function without the pack, or any partial number
-  of parameters, these calls return a callable object with the given parameters
-  bound.
-- All algorithms are in the `hal` namespace, versions that work on elements in
-  reverse order are in the `hal::reverse` namespace.
-- Empty parameter packs cannot be used, will only return a callable object.
+**HAL** provides algorithms operating over parameter packs and other static,
+heterogeneous data structures.
 
 ```cpp
-- auto for_each(UnaryFunction, Elements...) -> void;
-    Applies UnaryFunction to each Element.
-
-- auto all_of(UnaryPredicate, Elements...) -> bool;
-    Return true if all of UnaryPredicate(Elements...) are true.
-
-- auto any_of(UnaryPredicate, Elements...) -> bool;
-    Return true if any of UnaryPredicate(Elements...) are true.
-
-- auto none_of(UnaryPredicate, Elements...) -> bool;
-    Return true if none of UnaryPredicate(Elements...) are true.
+auto print = [](auto x){ std::cout << x << ' '; };
+hal::for_each(print, 5, "hello", 5.2, 'a', Foo{});
 ```
 
-## Examples
-##### Normal Use
+Each algorithm can have its non-parameter pack arguments [partially
+applied](partial_application.md).
+
+The top-level namespace is `hal::`. The `hal::reverse::` namespace contains
+algorithms that work on elements from the last to the first element.
+
+Namespaces `hal::memberwise::` and `hal::reverse::memberwise::` contain the same
+algorithms, but operating over the members of structs, tuples, and arrays. These
+take a single aggregate type argument instead of a parameter pack.
+
 ```cpp
-auto ss = std::stringstream{};
-hal::for_each([&ss](auto const& x) { ss << x; }, 2, 6.3, ' ', "hello, world!", -432, 0.5);
-assert(ss.str() == "26.3 hello, world!-4320.5");
+struct Foo {
+    int    a = 34;
+    char   b = '#';  // 35
+    double c = 7.432;
+} f;
+
+hal::memberwise::partial_sum(f);
+
+// Partial sum is a modifying algorithm.
+assert(f.a == 34);
+assert(f.b == 'E');
+assert(f.c == 76.432);
 ```
 
-##### Partial Application
-```cpp
-auto ss          = std::stringstream{};
-auto write_to_ss = hal::for_each([&ss](auto const& x) { ss << x; });
+More information on structs and tuples can be found [here](tuples_structs.md).
 
-write_to_ss(2, 6.3, ' ', "hello, world!", -432);
-write_to_ss(0.5);
-write_to_ss();
-assert(ss.str() == "26.3 hello, world!-4320.5");
-```
+If a function is listed as a **modifying algorithm**, it will make assignments
+to the passed in parameters.
 
-##### Reverse Order && Partial Application
-```cpp
-auto ss = std::stringstream{};
-auto write_to_ss_in_rev = hal::reverse::for_each([&ss](auto const& x) { ss << x; });
+All functions are constexpr if called with constexpr parameters.
 
-write_to_ss_in_rev(2, 6.3, ' ', "hello, world!", -432);
-write_to_ss_in_rev(0.5);
-write_to_ss_in_rev();
-assert(ss.str() == "-432hello, world! 6.320.5");
-```
+### - - > [The Algorithms](toc.md) < - -
+
+### Build
+
+This is a single header-only library, `include/hal.hpp` includes everything
+needed. If using CMake, a `hal` target is created that will add the proper
+include path.
+
+`#include <hal.hpp>`
+
+The tests can be built with `make hal-tests` after running cmake.

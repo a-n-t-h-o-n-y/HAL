@@ -118,4 +118,8 @@ TEST_CASE("reverse::reduce", "[HAL]")
         constexpr auto product_reduce = hr::reduce(1, product);
         static_assert(product_reduce(4, 3, 2, 1) == 24);
     }
+    SECTION("hal::memberwise::reduce")
+    {
+        // TODO
+    }
 }

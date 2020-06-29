@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-add_executable(tests
+add_executable(hal-tests EXCLUDE_FROM_ALL
     for_each.test.cpp
     reduce.test.cpp
     transform.test.cpp
@@ -18,7 +18,7 @@ add_executable(tests
     partial_transform_reduce.test.cpp
 )
 
-target_link_libraries(tests
+target_link_libraries(hal-tests
     PUBLIC
         hal
         catch_two

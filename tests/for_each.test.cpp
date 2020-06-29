@@ -74,3 +74,28 @@ TEST_CASE("reverse::for_each", "[HAL]")
             (hal::reverse::for_each([](auto) {}, nullptr, 'a', 4.3), true));
     }
 }
+
+TEST_CASE("hal::memberwise::for_each")
+{
+    // Iterate over a struct's members
+    struct Foo {
+        int a         = 3;
+        char b        = '#';
+        double c      = 5.212;
+        std::string d = "Hello, World!";
+    } f;
+
+    auto ss = std::stringstream{};
+
+    auto append_to_ss = [&ss](auto const& x) { ss << x; };
+
+    hal::memberwise::for_each(append_to_ss, f);
+
+    CHECK(ss.str() == "3#5.212Hello, World!");
+
+    // partial application
+    ss.str("");
+    auto mem_append = hal::memberwise::for_each(append_to_ss);
+    mem_append(f);
+    CHECK(ss.str() == "3#5.212Hello, World!");
+}
