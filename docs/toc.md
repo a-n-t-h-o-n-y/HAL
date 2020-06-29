@@ -18,6 +18,5 @@
 5. [`adjacent_transform`](adjacent_transform.md)
 
 ## Resources
-1. [Overview](overview.md)
-2. [Partial Application](partial_application.md)
-3. [Tuples and Structs](tuples_structs.md)
+1. [Partial Application](partial_application.md)
+2. [Tuples and Structs](tuples_structs.md)

@@ -4,12 +4,12 @@
 heterogeneous data structures.
 
 ```cpp
-auto print = [](auto x){ std::cout << x << ' '; };
+auto print = [](auto x){ std::cout << x; };
 hal::for_each(print, 5, "hello", 5.2, 'a', Foo{});
 ```
 
 Each algorithm can have its non-parameter pack arguments [partially
-applied](partial_application.md).
+applied](docs/partial_application.md).
 
 The top-level namespace is `hal::`. The `hal::reverse::` namespace contains
 algorithms that work on elements from the last to the first element.
@@ -33,14 +33,15 @@ assert(f.b == 'E');
 assert(f.c == 76.432);
 ```
 
-More information on structs and tuples can be found [here](tuples_structs.md).
+More information on structs and tuples can be found
+[here](docs/tuples_structs.md).
 
 If a function is listed as a **modifying algorithm**, it will make assignments
 to the passed in parameters.
 
 All functions are constexpr if called with constexpr parameters.
 
-### - - > [The Algorithms](toc.md) < - -
+### - - > [The Algorithms](docs/toc.md) < - -
 
 ### Build
 
