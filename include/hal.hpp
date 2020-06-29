@@ -276,7 +276,7 @@ template <typename UnaryOp>
 constexpr auto for_each(UnaryOp func)
 {
     return [f = std::move(func)](auto&& aggregate) {
-        return memberwise::for_each(
+        return hal::memberwise::for_each(
             f, std::forward<decltype(aggregate)>(aggregate));
     };
 }
@@ -886,6 +886,24 @@ constexpr auto for_each(UnaryOp func)
                                  std::forward<decltype(elements)>(elements)...);
     };
 }
+
+namespace memberwise {
+template <typename UnaryOp, typename Aggregate>
+constexpr auto for_each(UnaryOp&& func, Aggregate&& aggregate) -> void
+{
+    std::apply(hal::reverse::for_each(std::forward<UnaryOp>(func)),
+               hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+}
+
+template <typename UnaryOp>
+constexpr auto for_each(UnaryOp func)
+{
+    return [f = std::move(func)](auto&& aggregate) {
+        return hal::reverse::memberwise::for_each(
+            f, std::forward<decltype(aggregate)>(aggregate));
+    };
+}
+}  // namespace memberwise
 
 /* ---------------------------- reverse::all_of ----------------------------- */
 namespace detail {

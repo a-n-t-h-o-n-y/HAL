@@ -4,7 +4,7 @@
 
 #include <hal.hpp>
 
-TEST_CASE("for_each", "[HAL]")
+TEST_CASE("hal::for_each", "[HAL]")
 {
     SECTION("full call")
     {
@@ -15,6 +15,7 @@ TEST_CASE("for_each", "[HAL]")
 
         CHECK(ss.str() == "26.3 hello, world!-4320.5");
     }
+
     SECTION("modifying")
     {
         [](auto... args) {
@@ -54,6 +55,14 @@ TEST_CASE("reverse::for_each", "[HAL]")
         CHECK(ss.str() == "0.5-432hello, world! 6.32");
     }
 
+    SECTION("modifying")
+    {
+        [](auto... args) {
+            hal::reverse::for_each([](auto& x) { x = 1; }, args...);
+            hal::reverse::for_each([](auto x) { CHECK(x == 1); }, args...);
+        }(1, 5, 3);
+    }
+
     SECTION("partial application")
     {
         auto ss = std::stringstream{};
@@ -75,27 +84,107 @@ TEST_CASE("reverse::for_each", "[HAL]")
     }
 }
 
-TEST_CASE("hal::memberwise::for_each")
+TEST_CASE("hal::memberwise::for_each", "[HAL]")
 {
-    // Iterate over a struct's members
     struct Foo {
         int a         = 3;
         char b        = '#';
         double c      = 5.212;
         std::string d = "Hello, World!";
-    } f;
+    };
 
-    auto ss = std::stringstream{};
+    struct Empty {};
 
-    auto append_to_ss = [&ss](auto const& x) { ss << x; };
+    SECTION("full call")
+    {
+        auto ss      = std::stringstream{};
+        auto const f = Foo{};
+        hal::memberwise::for_each([&ss](auto const& x) { ss << x; }, f);
+        CHECK(ss.str() == "3#5.212Hello, World!");
+    }
 
-    hal::memberwise::for_each(append_to_ss, f);
+    SECTION("modifying")
+    {
+        auto f = Foo{};
+        hal::memberwise::for_each([](auto& x) { x += 1; }, f);
+        CHECK(f.a == 4);
+        CHECK(f.b == '$');
+        CHECK(f.c == 5.212 + 1.);
+        CHECK(f.d == "Hello, World!\1");
+    }
 
-    CHECK(ss.str() == "3#5.212Hello, World!");
+    SECTION("partial application")
+    {
+        auto ss = std::stringstream{};
+        auto write_to_ss =
+            hal::memberwise::for_each([&ss](auto const& x) { ss << x; });
 
-    // partial application
-    ss.str("");
-    auto mem_append = hal::memberwise::for_each(append_to_ss);
-    mem_append(f);
-    CHECK(ss.str() == "3#5.212Hello, World!");
+        auto const f = Foo{};
+        write_to_ss(f);
+        write_to_ss(Foo{});
+        write_to_ss(Empty{});
+        CHECK(ss.str() == "3#5.212Hello, World!3#5.212Hello, World!");
+    }
+
+    SECTION("constexpr")
+    {
+        constexpr auto nop = hal::memberwise::for_each([](auto) {});
+        constexpr auto e   = Empty{};
+        static_assert((nop(e), true));
+        static_assert((nop(Empty{}), true));
+        static_assert((hal::memberwise::for_each([](auto) {}, Empty{}), true));
+    }
+}
+
+TEST_CASE("hal::reverse::memberwise::for_each", "[HAL]")
+{
+    struct Foo {
+        int a         = 3;
+        char b        = '#';
+        double c      = 5.212;
+        std::string d = "Hello, World!";
+    };
+
+    struct Empty {};
+
+    SECTION("full call")
+    {
+        auto ss      = std::stringstream{};
+        auto const f = Foo{};
+        hal::reverse::memberwise::for_each([&ss](auto const& x) { ss << x; },
+                                           f);
+        CHECK(ss.str() == "Hello, World!5.212#3");
+    }
+
+    SECTION("modifying")
+    {
+        auto f = Foo{};
+        hal::reverse::memberwise::for_each([](auto& x) { x += 1; }, f);
+        CHECK(f.a == 4);
+        CHECK(f.b == '$');
+        CHECK(f.c == 5.212 + 1.);
+        CHECK(f.d == "Hello, World!\1");
+    }
+
+    SECTION("partial application")
+    {
+        auto ss          = std::stringstream{};
+        auto write_to_ss = hal::reverse::memberwise::for_each(
+            [&ss](auto const& x) { ss << x; });
+
+        auto const f = Foo{};
+        write_to_ss(f);
+        write_to_ss(Foo{});
+        write_to_ss(Empty{});
+        CHECK(ss.str() == "Hello, World!5.212#3Hello, World!5.212#3");
+    }
+
+    SECTION("constexpr")
+    {
+        constexpr auto nop = hal::reverse::memberwise::for_each([](auto) {});
+        constexpr auto e   = Empty{};
+        static_assert((nop(e), true));
+        static_assert((nop(Empty{}), true));
+        static_assert((hal::memberwise::for_each([](auto) {}, Empty{}), true));
+    }
 }
