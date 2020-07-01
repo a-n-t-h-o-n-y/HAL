@@ -315,9 +315,15 @@ namespace memberwise {
 template <typename T, typename BinaryOp, typename Aggregate>
 constexpr auto reduce(T init, BinaryOp&& reduce_fn, Aggregate&& aggregate) -> T
 {
-    return std::apply(
-        hal::reduce(std::move(init), std::forward<BinaryOp>(reduce_fn)),
-        hal::to_ref_tuple(std::forward<T>(aggregate)));
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size == 0)
+        return init;
+    else {
+        return std::apply(
+            hal::reduce(std::move(init), std::forward<BinaryOp>(reduce_fn)),
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
 }
 
 template <typename T>
@@ -325,7 +331,7 @@ constexpr auto reduce(T init)
 {
     return detail::Partial_application_two{
         [init = std::move(init)](auto&& reduce_fn, auto&& aggregate) {
-            return memberwise::reduce(
+            return hal::memberwise::reduce(
                 init, std::forward<decltype(reduce_fn)>(reduce_fn),
                 std::forward<decltype(aggregate)>(aggregate));
         }};
@@ -337,7 +343,7 @@ constexpr auto reduce(T init, BinaryOp reduce_fn)
     return detail::Partial_application_one{
         [init      = std::move(init),
          reduce_fn = std::move(reduce_fn)](auto&& aggregate) {
-            return memberwise::reduce(
+            return hal::memberwise::reduce(
                 init, reduce_fn, std::forward<decltype(aggregate)>(aggregate));
         }};
 }
@@ -380,6 +386,45 @@ constexpr auto partial_reduce(T init, BinaryOp reduce_fn)
                 init, reduce_fn, std::forward<decltype(elements)>(elements)...);
         }};
 }
+
+namespace memberwise {
+template <typename T, typename BinaryOp, typename Aggregate>
+constexpr void partial_reduce(T init,
+                              BinaryOp&& reduce_fn,
+                              Aggregate&& aggregate)
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size != 0) {
+        return std::apply(
+            hal::partial_reduce(std::move(init),
+                                std::forward<BinaryOp>(reduce_fn)),
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+
+template <typename T>
+constexpr auto partial_reduce(T init)
+{
+    return detail::Partial_application_two{
+        [init = std::move(init)](auto&& reduce_fn, auto&& aggregate) {
+            return hal::memberwise::partial_reduce(
+                init, std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(aggregate)>(aggregate));
+        }};
+}
+
+template <typename T, typename BinaryOp>
+constexpr auto partial_reduce(T init, BinaryOp reduce_fn)
+{
+    return detail::Partial_application_one{
+        [init      = std::move(init),
+         reduce_fn = std::move(reduce_fn)](auto&& aggregate) {
+            return hal::memberwise::partial_reduce(
+                init, reduce_fn, std::forward<decltype(aggregate)>(aggregate));
+        }};
+}
+}  // namespace memberwise
 
 /* ------------------------------- transform -------------------------------- */
 template <typename UnaryOp, typename... Elements>
@@ -829,6 +874,22 @@ constexpr void partial_sum(Elements&&... elements)
                    std::plus<>{})(std::forward<Elements>(elements)...);
 }
 
+namespace memberwise {
+template <typename Aggregate>
+constexpr void partial_sum(Aggregate&& aggregate)
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size != 0) {
+        std::apply(
+            [](auto&&... elements) {
+                hal::partial_sum(std::forward<decltype(elements)>(elements)...);
+            },
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+}  // namespace memberwise
+
 /* -------------------------- partial_difference ---------------------------- */
 
 template <typename... Elements>
@@ -841,6 +902,23 @@ constexpr void partial_difference(Elements&&... elements)
     partial_reduce(reduce_t(0),
                    std::minus<>{})(std::forward<Elements>(elements)...);
 }
+
+namespace memberwise {
+template <typename Aggregate>
+constexpr void partial_difference(Aggregate&& aggregate)
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size != 0) {
+        std::apply(
+            [](auto&&... elements) {
+                hal::partial_difference(
+                    std::forward<decltype(elements)>(elements)...);
+            },
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+}  // namespace memberwise
 
 /* --------------------------- partial_product ------------------------------ */
 
@@ -855,6 +933,23 @@ constexpr void partial_product(Elements&&... elements)
                    std::multiplies<>{})(std::forward<Elements>(elements)...);
 }
 
+namespace memberwise {
+template <typename Aggregate>
+constexpr void partial_product(Aggregate&& aggregate)
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size != 0) {
+        std::apply(
+            [](auto&&... elements) {
+                hal::partial_product(
+                    std::forward<decltype(elements)>(elements)...);
+            },
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+}  // namespace memberwise
+
 /* --------------------------- partial_quotient ----------------------------- */
 
 template <typename... Elements>
@@ -867,6 +962,27 @@ constexpr void partial_quotient(Elements&&... elements)
     partial_reduce(reduce_t(1),
                    std::divides<>{})(std::forward<Elements>(elements)...);
 }
+
+namespace memberwise {
+template <typename Aggregate>
+constexpr void partial_quotient(Aggregate&& aggregate)
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size != 0) {
+        std::apply(
+            [](auto&&... elements) {
+                hal::partial_quotient(
+                    std::forward<decltype(elements)>(elements)...);
+            },
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+}  // namespace memberwise
+
+/* --------------------------------------------------------------------------
+   --------------------------------------------------------------------------
+   -------------------------------------------------------------------------- */
 
 namespace reverse {
 
@@ -1065,6 +1181,45 @@ constexpr auto reduce(T init, BinaryOp reduce_fn)
         }};
 }
 
+namespace memberwise {
+template <typename T, typename BinaryOp, typename Aggregate>
+constexpr auto reduce(T init, BinaryOp&& reduce_fn, Aggregate&& aggregate) -> T
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size == 0)
+        return init;
+    else {
+        return std::apply(
+            hal::reverse::reduce(std::move(init),
+                                 std::forward<BinaryOp>(reduce_fn)),
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+
+template <typename T>
+constexpr auto reduce(T init)
+{
+    return hal::detail::Partial_application_two{
+        [init = std::move(init)](auto&& reduce_fn, auto&& aggregate) {
+            return hal::reverse::memberwise::reduce(
+                init, std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(aggregate)>(aggregate));
+        }};
+}
+
+template <typename T, typename BinaryOp>
+constexpr auto reduce(T init, BinaryOp reduce_fn)
+{
+    return hal::detail::Partial_application_one{
+        [init      = std::move(init),
+         reduce_fn = std::move(reduce_fn)](auto&& aggregate) {
+            return hal::reverse::memberwise::reduce(
+                init, reduce_fn, std::forward<decltype(aggregate)>(aggregate));
+        }};
+}
+}  // namespace memberwise
+
 /* ----------------------- reverse::partial_reduce -------------------------- */
 template <typename T, typename BinaryOp, typename... Elements>
 constexpr void partial_reduce(T init,
@@ -1101,6 +1256,45 @@ constexpr auto partial_reduce(T init, BinaryOp reduce_fn)
                 init, reduce_fn, std::forward<decltype(elements)>(elements)...);
         }};
 }
+
+namespace memberwise {
+template <typename T, typename BinaryOp, typename Aggregate>
+constexpr void partial_reduce(T init,
+                              BinaryOp&& reduce_fn,
+                              Aggregate&& aggregate)
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size != 0) {
+        return std::apply(
+            hal::reverse::partial_reduce(std::move(init),
+                                         std::forward<BinaryOp>(reduce_fn)),
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+
+template <typename T>
+constexpr auto partial_reduce(T init)
+{
+    return hal::detail::Partial_application_two{
+        [init = std::move(init)](auto&& reduce_fn, auto&& aggregate) {
+            return hal::reverse::memberwise::partial_reduce(
+                init, std::forward<decltype(reduce_fn)>(reduce_fn),
+                std::forward<decltype(aggregate)>(aggregate));
+        }};
+}
+
+template <typename T, typename BinaryOp>
+constexpr auto partial_reduce(T init, BinaryOp reduce_fn)
+{
+    return hal::detail::Partial_application_one{
+        [init      = std::move(init),
+         reduce_fn = std::move(reduce_fn)](auto&& aggregate) {
+            return hal::reverse::memberwise::partial_reduce(
+                init, reduce_fn, std::forward<decltype(aggregate)>(aggregate));
+        }};
+}
+}  // namespace memberwise
 
 /* -------------------------- reverse::transform ---------------------------- */
 
@@ -1367,6 +1561,23 @@ constexpr void partial_sum(Elements&&... elements)
                             std::plus<>{})(std::forward<Elements>(elements)...);
 }
 
+namespace memberwise {
+template <typename Aggregate>
+constexpr void partial_sum(Aggregate&& aggregate)
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size != 0) {
+        std::apply(
+            [](auto&&... elements) {
+                hal::reverse::partial_sum(
+                    std::forward<decltype(elements)>(elements)...);
+            },
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+}  // namespace memberwise
+
 /* --------------------- reverse::partial_difference ------------------------ */
 
 template <typename... Elements>
@@ -1379,6 +1590,23 @@ constexpr void partial_difference(Elements&&... elements)
     reverse::partial_reduce(
         reduce_t(0), std::minus<>{})(std::forward<Elements>(elements)...);
 }
+
+namespace memberwise {
+template <typename Aggregate>
+constexpr void partial_difference(Aggregate&& aggregate)
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size != 0) {
+        std::apply(
+            [](auto&&... elements) {
+                hal::reverse::partial_difference(
+                    std::forward<decltype(elements)>(elements)...);
+            },
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+}  // namespace memberwise
 
 /* ---------------------- reverse::partial_product -------------------------- */
 
@@ -1393,6 +1621,23 @@ constexpr void partial_product(Elements&&... elements)
         reduce_t(1), std::multiplies<>{})(std::forward<Elements>(elements)...);
 }
 
+namespace memberwise {
+template <typename Aggregate>
+constexpr void partial_product(Aggregate&& aggregate)
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size != 0) {
+        std::apply(
+            [](auto&&... elements) {
+                hal::reverse::partial_product(
+                    std::forward<decltype(elements)>(elements)...);
+            },
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+}  // namespace memberwise
+
 /* ---------------------- reverse::partial_quotient ------------------------- */
 
 template <typename... Elements>
@@ -1406,6 +1651,23 @@ constexpr void partial_quotient(Elements&&... elements)
         reduce_t(1), std::divides<>{})(std::forward<Elements>(elements)...);
 }
 
+namespace memberwise {
+template <typename Aggregate>
+constexpr void partial_quotient(Aggregate&& aggregate)
+{
+    constexpr auto size =
+        std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
+    if constexpr (size != 0) {
+        std::apply(
+            [](auto&&... elements) {
+                hal::reverse::partial_quotient(
+                    std::forward<decltype(elements)>(elements)...);
+            },
+            hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
+    }
+}
+
+}  // namespace memberwise
 }  // namespace reverse
 }  // namespace hal
 #endif  // HAL_HPP

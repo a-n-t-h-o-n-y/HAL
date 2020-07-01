@@ -1,4 +1,5 @@
 #include <sstream>
+#include <string>
 
 #include <catch2/catch.hpp>
 
@@ -6,7 +7,7 @@
 
 TEST_CASE("hal::for_each", "[HAL]")
 {
-    SECTION("full call")
+    SECTION("full call & call order")
     {
         auto ss = std::stringstream{};
 
@@ -45,7 +46,7 @@ TEST_CASE("hal::for_each", "[HAL]")
 
 TEST_CASE("reverse::for_each", "[HAL]")
 {
-    SECTION("full call")
+    SECTION("full call & call order")
     {
         auto ss = std::stringstream{};
 
@@ -95,7 +96,7 @@ TEST_CASE("hal::memberwise::for_each", "[HAL]")
 
     struct Empty {};
 
-    SECTION("full call")
+    SECTION("full call & call order")
     {
         auto ss      = std::stringstream{};
         auto const f = Foo{};
@@ -147,7 +148,7 @@ TEST_CASE("hal::reverse::memberwise::for_each", "[HAL]")
 
     struct Empty {};
 
-    SECTION("full call")
+    SECTION("full call & call order")
     {
         auto ss      = std::stringstream{};
         auto const f = Foo{};
