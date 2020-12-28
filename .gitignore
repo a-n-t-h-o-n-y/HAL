@@ -4,3 +4,5 @@ build/
 out.*/
 tags
 compile_commands.json
+.cache/
+.clangd/

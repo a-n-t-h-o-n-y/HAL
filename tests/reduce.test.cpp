@@ -58,7 +58,6 @@ TEST_CASE("hal::reduce", "[HAL]")
         auto sum_reduce   = empty_reduce(sum);
         CHECK(sum_reduce(1, 2, 3, 4) == 10);
         CHECK(sum_reduce(1) == 1);
-        CHECK(sum_reduce() == 0);
 
         CHECK(empty_reduce(sum, 1, 2, 3, 4) == 10);
 

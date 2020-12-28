@@ -24,4 +24,4 @@ target_link_libraries(hal-tests
         catch_two
 )
 
-add_test(NAME tests COMMAND tests)
+add_test(NAME tests COMMAND hal-tests)

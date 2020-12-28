@@ -175,145 +175,116 @@ struct Identity {
     }
 };
 
-/* --------------------------- Reduce Helpers --------------------------------*/
+/* ------------------------------- Curried -----------------------------------*/
+// Inspired by Functional Programming in C++ by Ivan Cukic, section 11.3.
 
-/// Provides a single variadic call operator to finish the call to \p fn.
-template <typename Fn>
-class Partial_application_one {
+/// Creates a Curried Function.
+/** Wraps a function which captures arguments with the call operator until
+    minimum_args is reached, and the function can be invoked with the captured
+    arguments. Use std::reference_wrapper if you need captured arguments to be
+    references. */
+template <std::size_t minimum_args,
+          typename Function,
+          typename... Captured_args>
+class Curried {
    public:
-    constexpr Partial_application_one(Fn fn) : fn_{std::move(fn)} {}
+    // Needed because: like std::decay_t, but with std::reference_wrapper -> &
+    using Captured_t =
+        decltype(std::make_tuple(std::declval<Captured_args>()...));
 
    public:
-    template <typename... Elements>
-    constexpr auto operator()(Elements&&... elements) const
+    /// Create a Curried function with no captured arguments.
+    constexpr explicit Curried(Function f) : function_{std::move(f)} {}
+
+    /// Internal use only, can't be private because of templates being diff type
+    constexpr Curried(Function f, Captured_t args)
+        : function_{std::move(f)}, captured_{std::move(args)}
+    {}
+
+   public:
+    /// Either capture the args or invoke the function and return the result.
+    template <typename... New_args>
+    constexpr auto operator()(New_args&&... args) const
     {
-        return fn_(std::forward<Elements>(elements)...);
+        auto constexpr arg_count =
+            sizeof...(New_args) + sizeof...(Captured_args);
+
+        if constexpr (arg_count >= minimum_args &&
+                      std::is_invocable_v<Function, Captured_args...,
+                                          New_args...>) {
+            // If invoking the function, use references of the args...
+            auto all_args = std::tuple_cat(captured_, std::tie(args...));
+            return std::apply(function_, all_args);
+        }
+        else {
+            auto new_args = std::make_tuple(std::forward<New_args>(args)...);
+            auto all_args = std::tuple_cat(captured_, std::move(new_args));
+            return Curried<minimum_args, Function, Captured_args...,
+                           New_args...>{function_, all_args};
+        }
     }
 
-   protected:
-    Fn fn_;
-};
-
-/// Provides call-op that binds one argument and returns a variadic callable.
-template <typename Fn>
-class Partial_application_two : public Partial_application_one<Fn> {
    private:
-    using Base_t = Partial_application_one<Fn>;
-
-   public:
-    constexpr Partial_application_two(Fn fn) : Base_t{std::move(fn)} {}
-
-   public:
-    using Base_t::operator();
-
-    template <typename T>
-    constexpr auto operator()(T x) const
-    {
-        return [fn_ = Base_t::fn_, x = std::move(x)](auto&&... elements) {
-            return fn_(x, std::forward<decltype(elements)>(elements)...);
-        };
-    }
+    Function function_;
+    Captured_t captured_;
 };
 
-/// Provides call-op that binds two arguments and returns a variadic callable.
-template <typename Fn>
-class Partial_application_three : public Partial_application_two<Fn> {
-   private:
-    using Base_t = Partial_application_two<Fn>;
-
-   public:
-    using Base_t::operator();
-
-    constexpr Partial_application_three(Fn fn) : Base_t{std::move(fn)} {}
-
-   public:
-    template <typename T, typename U>
-    constexpr auto operator()(T x, U y) const
-    {
-        return [fn_ = Base_t::fn_, x = std::move(x),
-                y = std::move(y)](auto&&... elements) {
-            return fn_(x, y, std::forward<decltype(elements)>(elements)...);
-        };
-    }
-
-    template <typename T>
-    constexpr auto operator()(T x) const
-    {
-        return [fn_ = Base_t::fn_, x = std::move(x)](auto&& y) {
-            return [fn_ = fn_, x = x, y = y](auto&&... elements) {
-                return fn_(x, y, std::forward<decltype(elements)>(elements)...);
-            };
-        };
-    }
-};
-
+/// Make a Curried function object.
+template <std::size_t minimum_args, typename Function>
+constexpr auto make_curried(Function&& f) -> Curried<minimum_args, Function>
+{
+    return Curried<minimum_args, Function>{std::forward<Function>(f)};
+}
 }  // namespace detail
 
 /* -------------------------------- for_each -------------------------------- */
 template <typename UnaryOp, typename... Elements>
-constexpr auto for_each(UnaryOp&& func, Elements&&... elements) -> void
+constexpr auto for_each_impl(UnaryOp&& func, Elements&&... elements) -> void
 {
     (func(std::forward<Elements>(elements)), ...);
 }
 
-template <typename UnaryOp>
-constexpr auto for_each(UnaryOp func)
-{
-    return [f = std::move(func)](auto&&... elements) {
-        return for_each(f, std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr for_each =
+    detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return for_each_impl(std::forward<decltype(a)>(a),
+                             std::forward<decltype(b)>(b)...);
+    });
 
 namespace memberwise {
 template <typename UnaryOp, typename Aggregate>
-constexpr auto for_each(UnaryOp&& func, Aggregate&& aggregate) -> void
+constexpr auto for_each_impl(UnaryOp&& func, Aggregate&& aggregate) -> void
 {
     std::apply(hal::for_each(std::forward<UnaryOp>(func)),
                hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
 }
 
-template <typename UnaryOp>
-constexpr auto for_each(UnaryOp func)
-{
-    return [f = std::move(func)](auto&& aggregate) {
-        return hal::memberwise::for_each(
-            f, std::forward<decltype(aggregate)>(aggregate));
-    };
-}
+inline auto constexpr for_each =
+    hal::detail::make_curried<1>([](auto&& a, auto&& b) {
+        return hal::memberwise::for_each_impl(std::forward<decltype(a)>(a),
+                                              std::forward<decltype(b)>(b));
+    });
 }  // namespace memberwise
 
 /* --------------------------------- reduce --------------------------------- */
 template <typename T, typename BinaryOp, typename... Elements>
-constexpr auto reduce(T init, BinaryOp&& reduce_fn, Elements&&... elements) -> T
+constexpr auto reduce_impl(T init, BinaryOp&& reduce_fn, Elements&&... elements)
+    -> T
 {
     ((init = reduce_fn(init, std::forward<Elements>(elements))), ...);
     return init;
 }
 
-template <typename T>
-constexpr auto reduce(T init)
-{
-    return detail::Partial_application_two{
-        [init = std::move(init)](auto&& reduce_fn, auto&&... elements) {
-            return reduce(init, std::forward<decltype(reduce_fn)>(reduce_fn),
-                          std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename BinaryOp>
-constexpr auto reduce(T init, BinaryOp reduce_fn)
-{
-    return detail::Partial_application_one{
-        [init      = std::move(init),
-         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
-            return reduce(init, reduce_fn,
-                          std::forward<decltype(elements)>(elements)...);
-        }};
-}
+inline auto constexpr reduce =
+    detail::make_curried<3>([](auto&& a, auto&& b, auto&&... c) {
+        return reduce_impl(std::forward<decltype(a)>(a),
+                           std::forward<decltype(b)>(b),
+                           std::forward<decltype(c)>(c)...);
+    });
 
 namespace memberwise {
 template <typename T, typename BinaryOp, typename Aggregate>
-constexpr auto reduce(T init, BinaryOp&& reduce_fn, Aggregate&& aggregate) -> T
+constexpr auto reduce_impl(T init, BinaryOp&& reduce_fn, Aggregate&& aggregate)
+    -> T
 {
     constexpr auto size =
         std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
@@ -326,34 +297,19 @@ constexpr auto reduce(T init, BinaryOp&& reduce_fn, Aggregate&& aggregate) -> T
     }
 }
 
-template <typename T>
-constexpr auto reduce(T init)
-{
-    return detail::Partial_application_two{
-        [init = std::move(init)](auto&& reduce_fn, auto&& aggregate) {
-            return hal::memberwise::reduce(
-                init, std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(aggregate)>(aggregate));
-        }};
-}
-
-template <typename T, typename BinaryOp>
-constexpr auto reduce(T init, BinaryOp reduce_fn)
-{
-    return detail::Partial_application_one{
-        [init      = std::move(init),
-         reduce_fn = std::move(reduce_fn)](auto&& aggregate) {
-            return hal::memberwise::reduce(
-                init, reduce_fn, std::forward<decltype(aggregate)>(aggregate));
-        }};
-}
+inline auto constexpr reduce =
+    hal::detail::make_curried<3>([](auto&& a, auto&& b, auto&& c) {
+        return hal::memberwise::reduce_impl(std::forward<decltype(a)>(a),
+                                            std::forward<decltype(b)>(b),
+                                            std::forward<decltype(c)>(c));
+    });
 }  // namespace memberwise
 
 /* ---------------------------- partial_reduce ------------------------------ */
 template <typename T, typename BinaryOp, typename... Elements>
-constexpr void partial_reduce(T init,
-                              BinaryOp&& reduce_fn,
-                              Elements&&... elements)
+constexpr void partial_reduce_impl(T init,
+                                   BinaryOp&& reduce_fn,
+                                   Elements&&... elements)
 {
     auto wrapped_reduce = [&reduce_fn](T const& sum, auto& element) constexpr
     {
@@ -361,37 +317,22 @@ constexpr void partial_reduce(T init,
         element           = result;
         return result;
     };
-    reduce(std::move(init), wrapped_reduce,
-           std::forward<Elements>(elements)...);
+    reduce_impl(std::move(init), wrapped_reduce,
+                std::forward<Elements>(elements)...);
 }
 
-template <typename T>
-constexpr auto partial_reduce(T init)
-{
-    return detail::Partial_application_two{
-        [init = std::move(init)](auto&& reduce_fn, auto&&... elements) {
-            return partial_reduce(
-                init, std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename BinaryOp>
-constexpr auto partial_reduce(T init, BinaryOp reduce_fn)
-{
-    return detail::Partial_application_one{
-        [init      = std::move(init),
-         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
-            return partial_reduce(
-                init, reduce_fn, std::forward<decltype(elements)>(elements)...);
-        }};
-}
+inline auto constexpr partial_reduce =
+    detail::make_curried<3>([](auto&& a, auto&& b, auto&&... c) {
+        return partial_reduce_impl(std::forward<decltype(a)>(a),
+                                   std::forward<decltype(b)>(b),
+                                   std::forward<decltype(c)>(c)...);
+    });
 
 namespace memberwise {
 template <typename T, typename BinaryOp, typename Aggregate>
-constexpr void partial_reduce(T init,
-                              BinaryOp&& reduce_fn,
-                              Aggregate&& aggregate)
+constexpr void partial_reduce_impl(T init,
+                                   BinaryOp&& reduce_fn,
+                                   Aggregate&& aggregate)
 {
     constexpr auto size =
         std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
@@ -402,153 +343,70 @@ constexpr void partial_reduce(T init,
             hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
     }
 }
-
-template <typename T>
-constexpr auto partial_reduce(T init)
-{
-    return detail::Partial_application_two{
-        [init = std::move(init)](auto&& reduce_fn, auto&& aggregate) {
-            return hal::memberwise::partial_reduce(
-                init, std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(aggregate)>(aggregate));
-        }};
-}
-
-template <typename T, typename BinaryOp>
-constexpr auto partial_reduce(T init, BinaryOp reduce_fn)
-{
-    return detail::Partial_application_one{
-        [init      = std::move(init),
-         reduce_fn = std::move(reduce_fn)](auto&& aggregate) {
-            return hal::memberwise::partial_reduce(
-                init, reduce_fn, std::forward<decltype(aggregate)>(aggregate));
-        }};
-}
+inline auto constexpr partial_reduce =
+    hal::detail::make_curried<3>([](auto&& a, auto&& b, auto&& c) {
+        return hal::memberwise::partial_reduce_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b),
+            std::forward<decltype(c)>(c));
+    });
 }  // namespace memberwise
 
 /* ------------------------------- transform -------------------------------- */
 template <typename UnaryOp, typename... Elements>
-constexpr auto transform(UnaryOp&& transform_fn, Elements&&... elements) -> void
+constexpr auto transform_impl(UnaryOp&& transform_fn, Elements&&... elements)
+    -> void
 {
     ((elements = transform_fn(std::forward<Elements>(elements))), ...);
 }
 
-template <typename UnaryOp>
-constexpr auto transform(UnaryOp transform_fn)
-{
-    return [f = std::move(transform_fn)](auto&&... elements) {
-        return transform(f, std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr transform =
+    detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return transform_impl(std::forward<decltype(a)>(a),
+                              std::forward<decltype(b)>(b)...);
+    });
 
 /* --------------------------- transform_reduce ----------------------------- */
 
 template <typename T, typename UnaryOp, typename BinaryOp, typename... Elements>
-constexpr auto transform_reduce(T init,
-                                UnaryOp&& transform_fn,
-                                BinaryOp&& reduce_fn,
-                                Elements&&... elements) -> T
+constexpr auto transform_reduce_impl(T init,
+                                     UnaryOp&& transform_fn,
+                                     BinaryOp&& reduce_fn,
+                                     Elements&&... elements) -> T
 {
     ((init = reduce_fn(init, transform_fn(std::forward<Elements>(elements)))),
      ...);
     return init;
 }
 
-template <typename T>
-constexpr auto transform_reduce(T init)
-{
-    return detail::Partial_application_three{
-        [init = std::move(init)](auto&& transform_fn, auto&& reduce_fn,
-                                 auto&&... elements) {
-            return transform_reduce(
-                init, std::forward<decltype(transform_fn)>(transform_fn),
-                std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename UnaryOp>
-constexpr auto transform_reduce(T init, UnaryOp transform_fn)
-{
-    return detail::Partial_application_two{
-        [init = std::move(init), transform_fn = std::move(transform_fn)](
-            auto&& reduce_fn, auto&&... elements) {
-            return transform_reduce(
-                init, transform_fn,
-                std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename UnaryOp, typename BinaryOp>
-constexpr auto transform_reduce(T init,
-                                UnaryOp transform_fn,
-                                BinaryOp reduce_fn)
-{
-    return detail::Partial_application_one{
-        [init = std::move(init), transform_fn = std::move(transform_fn),
-         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
-            return transform_reduce(
-                init, transform_fn, reduce_fn,
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
+inline auto constexpr transform_reduce =
+    detail::make_curried<4>([](auto&& a, auto&& b, auto&& c, auto&&... d) {
+        return transform_reduce_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b),
+            std::forward<decltype(c)>(c), std::forward<decltype(d)>(d)...);
+    });
 
 /* ------------------------ partial_transform_reduce ------------------------ */
 template <typename T, typename UnaryOp, typename BinaryOp, typename... Elements>
-constexpr void partial_transform_reduce(T init,
-                                        UnaryOp&& transform_fn,
-                                        BinaryOp&& reduce_fn,
-                                        Elements&&... elements)
+constexpr void partial_transform_reduce_impl(T init,
+                                             UnaryOp&& transform_fn,
+                                             BinaryOp&& reduce_fn,
+                                             Elements&&... elements)
 {
     ((std::forward<Elements>(elements) = init =
           reduce_fn(init, transform_fn(std::forward<Elements>(elements)))),
      ...);
 }
 
-template <typename T>
-constexpr auto partial_transform_reduce(T init)
-{
-    return detail::Partial_application_three{
-        [init = std::move(init)](auto&& transform_fn, auto&& reduce_fn,
-                                 auto&&... elements) {
-            return partial_transform_reduce(
-                init, std::forward<decltype(transform_fn)>(transform_fn),
-                std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename UnaryOp>
-constexpr auto partial_transform_reduce(T init, UnaryOp transform_fn)
-{
-    return detail::Partial_application_two{
-        [init = std::move(init), transform_fn = std::move(transform_fn)](
-            auto&& reduce_fn, auto&&... elements) {
-            return partial_transform_reduce(
-                init, transform_fn,
-                std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename UnaryOp, typename BinaryOp>
-constexpr auto partial_transform_reduce(T init,
-                                        UnaryOp transform_fn,
-                                        BinaryOp reduce_fn)
-{
-    return detail::Partial_application_one{
-        [init = std::move(init), transform_fn = std::move(transform_fn),
-         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
-            return partial_transform_reduce(
-                init, transform_fn, reduce_fn,
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
+inline auto constexpr partial_transform_reduce =
+    detail::make_curried<4>([](auto&& a, auto&& b, auto&& c, auto&&... d) {
+        return partial_transform_reduce_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b),
+            std::forward<decltype(c)>(c), std::forward<decltype(d)>(d)...);
+    });
 
 /* -------------------------------- find_if --------------------------------- */
 template <typename UnaryOp, typename... Elements>
-constexpr auto find_if(UnaryOp&& predicate, Elements&&... elements)
+constexpr auto find_if_impl(UnaryOp&& predicate, Elements&&... elements)
     -> std::size_t
 {
     auto increment_until_true = [still_going = true](std::size_t count,
@@ -556,24 +414,21 @@ constexpr auto find_if(UnaryOp&& predicate, Elements&&... elements)
         return still_going && !boolean ? count + 1
                                        : (still_going = false, count);
     };
-    return transform_reduce(0uL, std::forward<UnaryOp>(predicate),
-                            increment_until_true,
-                            std::forward<Elements>(elements)...);
+    return transform_reduce_impl(0uL, std::forward<UnaryOp>(predicate),
+                                 increment_until_true,
+                                 std::forward<Elements>(elements)...);
 }
 
-template <typename UnaryOp>
-constexpr auto find_if(UnaryOp predicate)
-{
-    return [predicate = std::move(predicate)](auto&&... elements) {
-        return find_if(predicate,
-                       std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr find_if =
+    detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return find_if_impl(std::forward<decltype(a)>(a),
+                            std::forward<decltype(b)>(b)...);
+    });
 
 /* ------------------------------ find_if_not ------------------------------- */
 
 template <typename UnaryOp, typename... Elements>
-constexpr auto find_if_not(UnaryOp&& predicate, Elements&&... elements)
+constexpr auto find_if_not_impl(UnaryOp&& predicate, Elements&&... elements)
     -> std::size_t
 {
     // std::not_fn is not constexpr, can't put this in its own function, not
@@ -583,43 +438,37 @@ constexpr auto find_if_not(UnaryOp&& predicate, Elements&&... elements)
             return !f(std::forward<decltype(x)>(x)...);
         };
     };
-    return find_if(not_fn(std::forward<UnaryOp>(predicate)),
-                   std::forward<Elements>(elements)...);
+    return find_if_impl(not_fn(std::forward<UnaryOp>(predicate)),
+                        std::forward<Elements>(elements)...);
 }
 
-template <typename UnaryOp>
-constexpr auto find_if_not(UnaryOp&& predicate)
-{
-    return [predicate = std::forward<UnaryOp>(predicate)](auto&&... elements) {
-        return find_if_not(predicate,
-                           std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr find_if_not =
+    detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return find_if_not_impl(std::forward<decltype(a)>(a),
+                                std::forward<decltype(b)>(b)...);
+    });
 
 /* --------------------------------- find ----------------------------------- */
 
 template <typename T, typename... Elements>
-constexpr auto find(T&& x, Elements&&... elements) -> std::size_t
+constexpr auto find_impl(T&& x, Elements&&... elements) -> std::size_t
 {
     auto equal_to_x = [&](auto y) { return y == x; };
-    return find_if(equal_to_x, std::forward<Elements>(elements)...);
+    return find_if_impl(equal_to_x, std::forward<Elements>(elements)...);
 }
 
-template <typename T>
-constexpr auto find(T x)
-{
-    return [x = std::move(x)](auto&&... elements) {
-        return find(x, std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr find = detail::make_curried<2>([](auto&& a, auto&&... b) {
+    return find_impl(std::forward<decltype(a)>(a),
+                     std::forward<decltype(b)>(b)...);
+});
 
 /* -------------------------------- count_if -------------------------------- */
 
 template <typename UnaryOp, typename... Elements>
-constexpr auto count_if(UnaryOp&& predicate, Elements&&... elements)
+constexpr auto count_if_impl(UnaryOp&& predicate, Elements&&... elements)
     -> std::size_t
 {
-    return reduce(
+    return reduce_impl(
         0uL,
         [&predicate](auto count, auto const& x) {
             return predicate(x) ? count + 1 : count;
@@ -627,94 +476,84 @@ constexpr auto count_if(UnaryOp&& predicate, Elements&&... elements)
         std::forward<Elements>(elements)...);
 }
 
-template <typename UnaryOp>
-constexpr auto count_if(UnaryOp predicate)
-{
-    return [predicate = std::move(predicate)](auto&&... elements) {
-        return count_if(predicate,
-                        std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr count_if =
+    detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return count_if_impl(std::forward<decltype(a)>(a),
+                             std::forward<decltype(b)>(b)...);
+    });
 
 /* --------------------------------- count ---------------------------------- */
 
 template <typename T, typename... Elements>
-constexpr auto count(T&& x, Elements&&... elements) -> std::size_t
+constexpr auto count_impl(T&& x, Elements&&... elements) -> std::size_t
 {
-    return count_if([&x](auto y) { return y == x; },
-                    std::forward<Elements>(elements)...);
+    return count_if_impl([&x](auto y) { return y == x; },
+                         std::forward<Elements>(elements)...);
 }
 
-template <typename T>
-constexpr auto count(T x)
-{
-    return [x = std::move(x)](auto&&... elements) {
-        return count(x, std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr count =
+    detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return count_impl(std::forward<decltype(a)>(a),
+                          std::forward<decltype(b)>(b)...);
+    });
 
 /* --------------------------------- all_of --------------------------------- */
 template <typename UnaryOp, typename... Elements>
-constexpr auto all_of(UnaryOp&& predicate, Elements&&... elements) -> bool
+constexpr auto all_of_impl(UnaryOp&& predicate, Elements&&... elements) -> bool
 {
     return (predicate(std::forward<Elements>(elements)) && ...);
 }
 
-template <typename UnaryOp>
-constexpr auto all_of(UnaryOp predicate)
-{
-    return [f = std::move(predicate)](auto&&... elements) {
-        return all_of(f, std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr all_of =
+    detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return all_of_impl(std::forward<decltype(a)>(a),
+                           std::forward<decltype(b)>(b)...);
+    });
 
 template <typename... Elements>
 constexpr auto all(Elements&&... elements) -> bool
 {
-    return all_of(detail::Identity{}, std::forward<Elements>(elements)...);
+    return all_of_impl(detail::Identity{}, std::forward<Elements>(elements)...);
 }
 
 /* --------------------------------- any_of --------------------------------- */
 template <typename UnaryOp, typename... Elements>
-constexpr auto any_of(UnaryOp&& predicate, Elements&&... elements) -> bool
+constexpr auto any_of_impl(UnaryOp&& predicate, Elements&&... elements) -> bool
 {
     return (predicate(std::forward<Elements>(elements)) || ...);
 }
 
-template <typename UnaryOp>
-constexpr auto any_of(UnaryOp predicate)
-{
-    return [f = std::move(predicate)](auto&&... elements) {
-        return any_of(f, std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr any_of =
+    detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return any_of_impl(std::forward<decltype(a)>(a),
+                           std::forward<decltype(b)>(b)...);
+    });
 
 template <typename... Elements>
 constexpr auto any(Elements&&... elements) -> bool
 {
-    return any_of(detail::Identity{}, std::forward<Elements>(elements)...);
+    return any_of_impl(detail::Identity{}, std::forward<Elements>(elements)...);
 }
 
 /* -------------------------------- none_of --------------------------------- */
 template <typename UnaryOp, typename... Elements>
-constexpr auto none_of(UnaryOp&& predicate, Elements&&... elements) -> bool
+constexpr auto none_of_impl(UnaryOp&& predicate, Elements&&... elements) -> bool
 {
-    return !any_of(std::forward<UnaryOp>(predicate),
-                   std::forward<Elements>(elements)...);
+    return !any_of_impl(std::forward<UnaryOp>(predicate),
+                        std::forward<Elements>(elements)...);
 }
 
-template <typename UnaryOp>
-constexpr auto none_of(UnaryOp predicate)
-{
-    return [f = std::move(predicate)](auto&&... elements) {
-        return none_of(f, std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr none_of =
+    detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return none_of_impl(std::forward<decltype(a)>(a),
+                            std::forward<decltype(b)>(b)...);
+    });
 
 template <typename... Elements>
 constexpr auto none(Elements&&... elements) -> bool
 {
-    return none_of(detail::Identity{}, std::forward<Elements>(elements)...);
+    return none_of_impl(detail::Identity{},
+                        std::forward<Elements>(elements)...);
 }
 
 /* ----------------------- adjacent_transform_reduce ------------------------ */
@@ -725,98 +564,61 @@ template <typename T,
           typename L,
           typename R,
           typename... Tail>
-constexpr auto adjacent_transform_reduce(T init,
-                                         BinaryOp_1&& transform_fn,
-                                         BinaryOp_2&& reduce_fn,
-                                         L&& left,
-                                         R&& right,
-                                         Tail&&... tail) -> T
+constexpr auto adjacent_transform_reduce_impl(T init,
+                                              BinaryOp_1&& transform_fn,
+                                              BinaryOp_2&& reduce_fn,
+                                              L&& left,
+                                              R&& right,
+                                              Tail&&... tail) -> T
 {
     auto transformed = transform_fn(std::forward<L>(left), right);
     auto reduced     = reduce_fn(std::move(init), std::move(transformed));
     if constexpr (sizeof...(Tail) == 0)
         return reduced;
     else {
-        return adjacent_transform_reduce(std::move(reduced), transform_fn,
-                                         reduce_fn, right,
-                                         std::forward<Tail>(tail)...);
+        return adjacent_transform_reduce_impl(std::move(reduced), transform_fn,
+                                              reduce_fn, right,
+                                              std::forward<Tail>(tail)...);
     }
 }
 
-// Partial Application
-template <typename T>
-constexpr auto adjacent_transform_reduce(T init)
-{
-    return detail::Partial_application_three{
-        [init = std::move(init)](auto&& transform_fn, auto&& reduce_fn,
-                                 auto&&... elements) {
-            return adjacent_transform_reduce(
-                init, std::forward<decltype(transform_fn)>(transform_fn),
-                std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename UnaryOp>
-constexpr auto adjacent_transform_reduce(T init, UnaryOp transform_fn)
-{
-    return detail::Partial_application_two{
-        [init = std::move(init), transform_fn = std::move(transform_fn)](
-            auto&& reduce_fn, auto&&... elements) {
-            return adjacent_transform_reduce(
-                init, transform_fn,
-                std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename UnaryOp, typename BinaryOp>
-constexpr auto adjacent_transform_reduce(T init,
-                                         UnaryOp transform_fn,
-                                         BinaryOp reduce_fn)
-{
-    return detail::Partial_application_one{
-        [init = std::move(init), transform_fn = std::move(transform_fn),
-         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
-            return adjacent_transform_reduce(
-                init, transform_fn, reduce_fn,
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
+inline auto constexpr adjacent_transform_reduce = detail::make_curried<5>(
+    [](auto&& a, auto&& b, auto&& c, auto&& d, auto&& e, auto&&... f) {
+        return adjacent_transform_reduce_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b),
+            std::forward<decltype(c)>(c), std::forward<decltype(d)>(d),
+            std::forward<decltype(e)>(e), std::forward<decltype(f)>(f)...);
+    });
 
 /* --------------------------- adjacent_transform --------------------------- */
 template <typename BinaryOp, typename L, typename R, typename... Tail>
-constexpr void adjacent_transform(BinaryOp&& transform_fn,
-                                  L&& left,
-                                  R&& right,
-                                  Tail&&... tail)
+constexpr void adjacent_transform_impl(BinaryOp&& transform_fn,
+                                       L&& left,
+                                       R&& right,
+                                       Tail&&... tail)
 {
     left = transform_fn(std::forward<L>(left), right);
     if constexpr (sizeof...(Tail) == 0)
         return;
     else {
-        return adjacent_transform(transform_fn, right,
-                                  std::forward<Tail>(tail)...);
+        return adjacent_transform_impl(transform_fn, right,
+                                       std::forward<Tail>(tail)...);
     }
 }
 
-// Partial Application
-template <typename BinaryOp>
-constexpr auto adjacent_transform(BinaryOp transform_fn)
-{
-    return detail::Partial_application_three{
-        [transform_fn = std::move(transform_fn)](auto&&... elements) {
-            return adjacent_transform(
-                transform_fn, std::forward<decltype(elements)>(elements)...);
-        }};
-}
+inline auto constexpr adjacent_transform =
+    detail::make_curried<3>([](auto&& a, auto&& b, auto&& c, auto&&... d) {
+        return adjacent_transform_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b),
+            std::forward<decltype(c)>(c), std::forward<decltype(d)>(d)...);
+    });
 
 /* -------------------------- adjacent_difference --------------------------- */
 template <typename... Elements>
 constexpr void adjacent_difference(Elements&&... elements)
 {
-    adjacent_transform([](auto const& l, auto const& r) { return r - l; },
-                       std::forward<Elements>(elements)...);
+    adjacent_transform_impl([](auto const& l, auto const& r) { return r - l; },
+                            std::forward<Elements>(elements)...);
 }
 
 /* ----------------------------- adjacent_find ------------------------------ */
@@ -828,9 +630,9 @@ constexpr auto adjacent_find(Elements&&... elements) -> std::size_t
                                                      bool found) mutable {
         return still_going && !found ? count + 1 : (still_going = false, count);
     };
-    return adjacent_transform_reduce(0uL, std::equal_to<>{},
-                                     increment_until_true,
-                                     std::forward<Elements>(elements)...);
+    return adjacent_transform_reduce_impl(0uL, std::equal_to<>{},
+                                          increment_until_true,
+                                          std::forward<Elements>(elements)...);
 }
 
 /* ---------------------------------- get ----------------------------------- */
@@ -981,55 +783,49 @@ constexpr void partial_quotient(Aggregate&& aggregate)
 }  // namespace memberwise
 
 /* --------------------------------------------------------------------------
-   --------------------------------------------------------------------------
+   ------------------------------ REVERSE -----------------------------------
    -------------------------------------------------------------------------- */
 
 namespace reverse {
 
 /* --------------------------- reverse::for_each ---------------------------- */
 template <typename UnaryOp, typename... Elements>
-constexpr auto for_each(UnaryOp&& func, Elements&&... elements) -> void
+constexpr auto for_each_impl(UnaryOp&& func, Elements&&... elements) -> void
 {
+    // clang 11.0.0 warning on unused expression result without void cast.
     [[maybe_unused]] auto foo = 0;
-    (foo = ... = (func(elements), 0));
+    (void)(foo = ... = (func(elements), 0));
 }
 
-template <typename UnaryOp>
-constexpr auto for_each(UnaryOp func)
-{
-    return [func = std::move(func)](auto&&... elements) {
-        return reverse::for_each(func,
-                                 std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr for_each =
+    detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return reverse::for_each_impl(std::forward<decltype(a)>(a),
+                                      std::forward<decltype(b)>(b)...);
+    });
 
 namespace memberwise {
 template <typename UnaryOp, typename Aggregate>
-constexpr auto for_each(UnaryOp&& func, Aggregate&& aggregate) -> void
+constexpr auto for_each_impl(UnaryOp&& func, Aggregate&& aggregate) -> void
 {
     std::apply(hal::reverse::for_each(std::forward<UnaryOp>(func)),
                hal::to_ref_tuple(std::forward<Aggregate>(aggregate)));
 }
 
-template <typename UnaryOp>
-constexpr auto for_each(UnaryOp func)
-{
-    return [f = std::move(func)](auto&& aggregate) {
-        return hal::reverse::memberwise::for_each(
-            f, std::forward<decltype(aggregate)>(aggregate));
-    };
-}
+inline auto constexpr for_each =
+    hal::detail::make_curried<1>([](auto&& a, auto&& b) {
+        return hal::reverse::memberwise::for_each_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b));
+    });
+
 }  // namespace memberwise
 
 /* ---------------------------- reverse::all_of ----------------------------- */
-namespace detail {
 template <typename UnaryOp>
-constexpr auto all_of_impl(UnaryOp &&) -> bool
+constexpr auto all_of_impl(UnaryOp&&) -> bool
 {
     return true;
 }
 
-// Base case of zero elements is ambiguous with partial application, new name.
 template <typename UnaryOp, typename Head, typename... Tail>
 constexpr auto all_of_impl(UnaryOp&& predicate, Head&& head, Tail&&... tail)
     -> bool
@@ -1038,40 +834,26 @@ constexpr auto all_of_impl(UnaryOp&& predicate, Head&& head, Tail&&... tail)
            predicate(head);
 }
 
-}  // namespace detail
-
-template <typename UnaryOp, typename... Elements>
-constexpr auto all_of(UnaryOp&& predicate, Elements&&... elements) -> bool
-{
-    return detail::all_of_impl(std::forward<UnaryOp>(predicate),
-                               std::forward<Elements>(elements)...);
-}
-
-template <typename UnaryOp>
-constexpr auto all_of(UnaryOp predicate)
-{
-    return [f = std::move(predicate)](auto&&... elements) {
-        return reverse::all_of(f,
-                               std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr all_of =
+    hal::detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return hal::reverse::all_of_impl(std::forward<decltype(a)>(a),
+                                         std::forward<decltype(b)>(b)...);
+    });
 
 template <typename... Elements>
 constexpr auto all(Elements&&... elements) -> bool
 {
-    return reverse::all_of(hal::detail::Identity{},
-                           std::forward<Elements>(elements)...);
+    return hal::reverse::all_of_impl(hal::detail::Identity{},
+                                     std::forward<Elements>(elements)...);
 }
 
 /* ---------------------------- reverse::any_of ----------------------------- */
-namespace detail {
 template <typename UnaryOp>
-constexpr auto any_of_impl(UnaryOp &&) -> bool
+constexpr auto any_of_impl(UnaryOp&&) -> bool
 {
     return false;
 }
 
-// Base case of zero elements is ambiguous with partial application, new name.
 template <typename UnaryOp, typename Head, typename... Tail>
 constexpr auto any_of_impl(UnaryOp&& predicate, Head&& head, Tail&&... tail)
     -> bool
@@ -1080,59 +862,43 @@ constexpr auto any_of_impl(UnaryOp&& predicate, Head&& head, Tail&&... tail)
            predicate(head);
 }
 
-}  // namespace detail
-
-template <typename UnaryOp, typename... Elements>
-constexpr auto any_of(UnaryOp&& predicate, Elements&&... elements) -> bool
-{
-    return detail::any_of_impl(std::forward<UnaryOp>(predicate),
-                               std::forward<Elements>(elements)...);
-}
-
-template <typename UnaryOp>
-constexpr auto any_of(UnaryOp predicate)
-{
-    return [f = std::move(predicate)](auto&&... elements) {
-        return reverse::any_of(f,
-                               std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr any_of =
+    hal::detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return hal::reverse::any_of_impl(std::forward<decltype(a)>(a),
+                                         std::forward<decltype(b)>(b)...);
+    });
 
 template <typename... Elements>
 constexpr auto any(Elements&&... elements) -> bool
 {
-    return reverse::any_of(hal::detail::Identity{},
-                           std::forward<Elements>(elements)...);
+    return hal::reverse::any_of_impl(hal::detail::Identity{},
+                                     std::forward<Elements>(elements)...);
 }
 
 /* --------------------------- reverse::none_of ----------------------------- */
 template <typename UnaryOp, typename... Elements>
-constexpr auto none_of(UnaryOp&& predicate, Elements&&... elements) -> bool
+constexpr auto none_of_impl(UnaryOp&& predicate, Elements&&... elements) -> bool
 {
-    return !reverse::any_of(std::forward<UnaryOp>(predicate),
-                            std::forward<Elements>(elements)...);
+    return !reverse::any_of_impl(std::forward<UnaryOp>(predicate),
+                                 std::forward<Elements>(elements)...);
 }
 
-template <typename UnaryOp>
-constexpr auto none_of(UnaryOp predicate)
-{
-    return [f = std::move(predicate)](auto&&... elements) {
-        return reverse::none_of(f,
-                                std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr none_of =
+    hal::detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return hal::reverse::none_of_impl(std::forward<decltype(a)>(a),
+                                          std::forward<decltype(b)>(b)...);
+    });
 
 template <typename... Elements>
 constexpr auto none(Elements&&... elements) -> bool
 {
-    return reverse::none_of(hal::detail::Identity{},
-                            std::forward<Elements>(elements)...);
+    return hal::reverse::none_of_impl(hal::detail::Identity{},
+                                      std::forward<Elements>(elements)...);
 }
 
 /* ---------------------------- reverse::reduce ----------------------------- */
-namespace detail {
 template <typename T, typename BinaryOp>
-constexpr auto reduce_impl(T init, BinaryOp &&) -> T
+constexpr auto reduce_impl(T init, BinaryOp&&) -> T
 {
     return init;
 }
@@ -1149,41 +915,17 @@ constexpr auto reduce_impl(T init,
         std::forward<Head>(head));
 }
 
-}  // namespace detail
-
-template <typename T, typename BinaryOp, typename... Elements>
-constexpr auto reduce(T init, BinaryOp&& reduce_fn, Elements&&... elements) -> T
-{
-    return detail::reduce_impl(std::move(init),
-                               std::forward<BinaryOp>(reduce_fn),
-                               std::forward<Elements>(elements)...);
-}
-
-template <typename T>
-constexpr auto reduce(T init)
-{
-    return hal::detail::Partial_application_two{
-        [init = std::move(init)](auto&& reduce_fn, auto&&... elements) {
-            return reverse::reduce(
-                init, std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename BinaryOp>
-constexpr auto reduce(T init, BinaryOp reduce_fn)
-{
-    return hal::detail::Partial_application_one{
-        [init      = std::move(init),
-         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
-            return reverse::reduce(
-                init, reduce_fn, std::forward<decltype(elements)>(elements)...);
-        }};
-}
+inline auto constexpr reduce =
+    hal::detail::make_curried<3>([](auto&& a, auto&& b, auto&&... c) {
+        return hal::reverse::reduce_impl(std::forward<decltype(a)>(a),
+                                         std::forward<decltype(b)>(b),
+                                         std::forward<decltype(c)>(c)...);
+    });
 
 namespace memberwise {
 template <typename T, typename BinaryOp, typename Aggregate>
-constexpr auto reduce(T init, BinaryOp&& reduce_fn, Aggregate&& aggregate) -> T
+constexpr auto reduce_impl(T init, BinaryOp&& reduce_fn, Aggregate&& aggregate)
+    -> T
 {
     constexpr auto size =
         std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
@@ -1197,34 +939,19 @@ constexpr auto reduce(T init, BinaryOp&& reduce_fn, Aggregate&& aggregate) -> T
     }
 }
 
-template <typename T>
-constexpr auto reduce(T init)
-{
-    return hal::detail::Partial_application_two{
-        [init = std::move(init)](auto&& reduce_fn, auto&& aggregate) {
-            return hal::reverse::memberwise::reduce(
-                init, std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(aggregate)>(aggregate));
-        }};
-}
-
-template <typename T, typename BinaryOp>
-constexpr auto reduce(T init, BinaryOp reduce_fn)
-{
-    return hal::detail::Partial_application_one{
-        [init      = std::move(init),
-         reduce_fn = std::move(reduce_fn)](auto&& aggregate) {
-            return hal::reverse::memberwise::reduce(
-                init, reduce_fn, std::forward<decltype(aggregate)>(aggregate));
-        }};
-}
+inline auto constexpr reduce =
+    hal::detail::make_curried<3>([](auto&& a, auto&& b, auto&& c) {
+        return hal::reverse::memberwise::reduce_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b),
+            std::forward<decltype(c)>(c));
+    });
 }  // namespace memberwise
 
 /* ----------------------- reverse::partial_reduce -------------------------- */
 template <typename T, typename BinaryOp, typename... Elements>
-constexpr void partial_reduce(T init,
-                              BinaryOp&& reduce_fn,
-                              Elements&&... elements)
+constexpr void partial_reduce_impl(T init,
+                                   BinaryOp&& reduce_fn,
+                                   Elements&&... elements)
 {
     auto wrapped_reduce = [&reduce_fn](T const& sum, auto& element) constexpr
     {
@@ -1232,36 +959,22 @@ constexpr void partial_reduce(T init,
         element           = result;
         return result;
     };
-    reverse::reduce(init, wrapped_reduce, std::forward<Elements>(elements)...);
+    reverse::reduce_impl(init, wrapped_reduce,
+                         std::forward<Elements>(elements)...);
 }
 
-template <typename T>
-constexpr auto partial_reduce(T init)
-{
-    return hal::detail::Partial_application_two{
-        [init = std::move(init)](auto&& reduce_fn, auto&&... elements) {
-            return reverse::partial_reduce(
-                init, std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename BinaryOp>
-constexpr auto partial_reduce(T init, BinaryOp reduce_fn)
-{
-    return hal::detail::Partial_application_one{
-        [init      = std::move(init),
-         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
-            return reverse::partial_reduce(
-                init, reduce_fn, std::forward<decltype(elements)>(elements)...);
-        }};
-}
+inline auto constexpr partial_reduce =
+    hal::detail::make_curried<3>([](auto&& a, auto&& b, auto&&... c) {
+        return hal::reverse::partial_reduce_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b),
+            std::forward<decltype(c)>(c)...);
+    });
 
 namespace memberwise {
 template <typename T, typename BinaryOp, typename Aggregate>
-constexpr void partial_reduce(T init,
-                              BinaryOp&& reduce_fn,
-                              Aggregate&& aggregate)
+constexpr void partial_reduce_impl(T init,
+                                   BinaryOp&& reduce_fn,
+                                   Aggregate&& aggregate)
 {
     constexpr auto size =
         std::tuple_size_v<decltype(hal::to_ref_tuple(aggregate))>;
@@ -1273,53 +986,36 @@ constexpr void partial_reduce(T init,
     }
 }
 
-template <typename T>
-constexpr auto partial_reduce(T init)
-{
-    return hal::detail::Partial_application_two{
-        [init = std::move(init)](auto&& reduce_fn, auto&& aggregate) {
-            return hal::reverse::memberwise::partial_reduce(
-                init, std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(aggregate)>(aggregate));
-        }};
-}
-
-template <typename T, typename BinaryOp>
-constexpr auto partial_reduce(T init, BinaryOp reduce_fn)
-{
-    return hal::detail::Partial_application_one{
-        [init      = std::move(init),
-         reduce_fn = std::move(reduce_fn)](auto&& aggregate) {
-            return hal::reverse::memberwise::partial_reduce(
-                init, reduce_fn, std::forward<decltype(aggregate)>(aggregate));
-        }};
-}
+inline auto constexpr partial_reduce =
+    hal::detail::make_curried<3>([](auto&& a, auto&& b, auto&& c) {
+        return hal::reverse::memberwise::partial_reduce_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b),
+            std::forward<decltype(c)>(c));
+    });
 }  // namespace memberwise
 
 /* -------------------------- reverse::transform ---------------------------- */
 
 template <typename UnaryOp, typename... Elements>
-constexpr auto transform(UnaryOp&& transform_fn, Elements&&... elements) -> void
+constexpr auto transform_impl(UnaryOp&& transform_fn, Elements&&... elements)
+    -> void
 {
+    // clang 11.0.0 warning on unused expression result without void cast.
     [[maybe_unused]] auto foo = 0;
-    (foo = ... =
-         (elements = transform_fn(std::forward<Elements>(elements)), 0));
+    (void)(foo = ... =
+               (elements = transform_fn(std::forward<Elements>(elements)), 0));
 }
 
-template <typename UnaryOp>
-constexpr auto transform(UnaryOp transform_fn)
-{
-    return [f = std::move(transform_fn)](auto&&... elements) {
-        return reverse::transform(
-            f, std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr transform =
+    hal::detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return hal::reverse::transform_impl(std::forward<decltype(a)>(a),
+                                            std::forward<decltype(b)>(b)...);
+    });
 
 /* ---------------------- reverse::transform_reduce ------------------------- */
-namespace detail {
 
 template <typename T, typename UnaryOp, typename BinaryOp>
-constexpr auto transform_reduce_impl(T init, UnaryOp&&, BinaryOp &&) -> T
+constexpr auto transform_reduce_impl(T init, UnaryOp&&, BinaryOp&&) -> T
 {
     return init;
 }
@@ -1342,65 +1038,16 @@ constexpr auto transform_reduce_impl(T init,
     return reduce_fn(std::move(tail_result), std::move(head_result));
 }
 
-}  // namespace detail
-
-template <typename T, typename UnaryOp, typename BinaryOp, typename... Elements>
-constexpr auto transform_reduce(T init,
-                                UnaryOp&& transform_fn,
-                                BinaryOp&& reduce_fn,
-                                Elements&&... elements) -> T
-{
-    return detail::transform_reduce_impl(
-        std::move(init), std::forward<UnaryOp>(transform_fn),
-        std::forward<BinaryOp>(reduce_fn), std::forward<Elements>(elements)...);
-}
-
-template <typename T>
-constexpr auto transform_reduce(T init)
-{
-    return hal::detail::Partial_application_three{
-        [init = std::move(init)](auto&& transform_fn, auto&& reduce_fn,
-                                 auto&&... elements) {
-            return reverse::transform_reduce(
-                init, std::forward<decltype(transform_fn)>(transform_fn),
-                std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename UnaryOp>
-constexpr auto transform_reduce(T init, UnaryOp transform_fn)
-{
-    return hal::detail::Partial_application_two{
-        [init = std::move(init), transform_fn = std::move(transform_fn)](
-            auto&& reduce_fn, auto&&... elements) {
-            return reverse::transform_reduce(
-                init, transform_fn,
-                std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename UnaryOp, typename BinaryOp>
-constexpr auto transform_reduce(T init,
-                                UnaryOp transform_fn,
-                                BinaryOp reduce_fn)
-{
-    return hal::detail::Partial_application_one{
-        [init = std::move(init), transform_fn = std::move(transform_fn),
-         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
-            return reverse::transform_reduce(
-                init, transform_fn, reduce_fn,
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
+inline auto constexpr transform_reduce =
+    hal::detail::make_curried<4>([](auto&& a, auto&& b, auto&& c, auto&&... d) {
+        return hal::reverse::transform_reduce_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b),
+            std::forward<decltype(c)>(c), std::forward<decltype(d)>(d)...);
+    });
 
 /* ------------------- reverse::partial_transform_reduce -------------------- */
-namespace detail {
-
 template <typename T, typename UnaryOp, typename BinaryOp>
-constexpr auto partial_transform_reduce_impl(T init, UnaryOp&&, BinaryOp &&)
-    -> T
+constexpr auto partial_transform_reduce_impl(T init, UnaryOp&&, BinaryOp&&) -> T
 {
     return init;
 }
@@ -1425,63 +1072,17 @@ constexpr auto partial_transform_reduce_impl(T init,
     return head;
 }
 
-}  // namespace detail
-
-template <typename T, typename UnaryOp, typename BinaryOp, typename... Elements>
-constexpr void partial_transform_reduce(T init,
-                                        UnaryOp&& transform_fn,
-                                        BinaryOp&& reduce_fn,
-                                        Elements&&... elements)
-{
-    detail::partial_transform_reduce_impl(
-        std::move(init), std::forward<UnaryOp>(transform_fn),
-        std::forward<BinaryOp>(reduce_fn), std::forward<Elements>(elements)...);
-}
-
-template <typename T>
-constexpr auto partial_transform_reduce(T init)
-{
-    return hal::detail::Partial_application_three{
-        [init = std::move(init)](auto&& transform_fn, auto&& reduce_fn,
-                                 auto&&... elements) {
-            return reverse::partial_transform_reduce(
-                init, std::forward<decltype(transform_fn)>(transform_fn),
-                std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename UnaryOp>
-constexpr auto partial_transform_reduce(T init, UnaryOp transform_fn)
-{
-    return hal::detail::Partial_application_two{
-        [init = std::move(init), transform_fn = std::move(transform_fn)](
-            auto&& reduce_fn, auto&&... elements) {
-            return reverse::partial_transform_reduce(
-                init, transform_fn,
-                std::forward<decltype(reduce_fn)>(reduce_fn),
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
-
-template <typename T, typename UnaryOp, typename BinaryOp>
-constexpr auto partial_transform_reduce(T init,
-                                        UnaryOp transform_fn,
-                                        BinaryOp reduce_fn)
-{
-    return hal::detail::Partial_application_one{
-        [init = std::move(init), transform_fn = std::move(transform_fn),
-         reduce_fn = std::move(reduce_fn)](auto&&... elements) {
-            return reverse::partial_transform_reduce(
-                init, transform_fn, reduce_fn,
-                std::forward<decltype(elements)>(elements)...);
-        }};
-}
+inline auto constexpr partial_transform_reduce =
+    hal::detail::make_curried<4>([](auto&& a, auto&& b, auto&& c, auto&&... d) {
+        return hal::reverse::partial_transform_reduce_impl(
+            std::forward<decltype(a)>(a), std::forward<decltype(b)>(b),
+            std::forward<decltype(c)>(c), std::forward<decltype(d)>(d)...);
+    });
 
 /* --------------------------- reverse::find_if ----------------------------- */
 
 template <typename UnaryOp, typename... Elements>
-constexpr auto find_if(UnaryOp&& predicate, Elements&&... elements)
+constexpr auto find_if_impl(UnaryOp&& predicate, Elements&&... elements)
     -> std::size_t
 {
     auto decrement_until_true =
@@ -1491,26 +1092,23 @@ constexpr auto find_if(UnaryOp&& predicate, Elements&&... elements)
                        : (still_going = false, count);
         };
 
-    auto const result = reverse::transform_reduce(
+    auto const result = reverse::transform_reduce_impl(
         sizeof...(Elements) - 1, std::forward<UnaryOp>(predicate),
         decrement_until_true, std::forward<Elements>(elements)...);
 
     return result == -1uL ? sizeof...(Elements) : result;
 }
 
-template <typename UnaryOp>
-constexpr auto find_if(UnaryOp predicate)
-{
-    return [predicate = std::move(predicate)](auto&&... elements) {
-        return reverse::find_if(predicate,
-                                std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr find_if =
+    hal::detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return hal::reverse::find_if_impl(std::forward<decltype(a)>(a),
+                                          std::forward<decltype(b)>(b)...);
+    });
 
 /* ------------------------- reverse::find_if_not --------------------------- */
 
 template <typename UnaryOp, typename... Elements>
-constexpr auto find_if_not(UnaryOp&& predicate, Elements&&... elements)
+constexpr auto find_if_not_impl(UnaryOp&& predicate, Elements&&... elements)
     -> std::size_t
 {
     constexpr auto not_fn = [](auto&& f) {
@@ -1518,35 +1116,31 @@ constexpr auto find_if_not(UnaryOp&& predicate, Elements&&... elements)
             return !f(std::forward<decltype(x)>(x)...);
         };
     };
-    return reverse::find_if(not_fn(std::forward<UnaryOp>(predicate)),
-                            std::forward<Elements>(elements)...);
+    return reverse::find_if_impl(not_fn(std::forward<UnaryOp>(predicate)),
+                                 std::forward<Elements>(elements)...);
 }
 
-template <typename UnaryOp>
-constexpr auto find_if_not(UnaryOp predicate)
-{
-    return [predicate = std::move(predicate)](auto&&... elements) {
-        return reverse::find_if_not(
-            predicate, std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr find_if_not =
+    hal::detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return hal::reverse::find_if_not_impl(std::forward<decltype(a)>(a),
+                                              std::forward<decltype(b)>(b)...);
+    });
 
 /* ---------------------------- reverse::find ------------------------------- */
 
 template <typename T, typename... Elements>
-constexpr auto find(T&& x, Elements&&... elements) -> std::size_t
+constexpr auto find_impl(T&& x, Elements&&... elements) -> std::size_t
 {
     auto equal_to_x = [&](auto y) { return y == x; };
-    return reverse::find_if(equal_to_x, std::forward<Elements>(elements)...);
+    return reverse::find_if_impl(equal_to_x,
+                                 std::forward<Elements>(elements)...);
 }
 
-template <typename T>
-constexpr auto find(T x)
-{
-    return [x = std::move(x)](auto&&... elements) {
-        return reverse::find(x, std::forward<decltype(elements)>(elements)...);
-    };
-}
+inline auto constexpr find =
+    hal::detail::make_curried<2>([](auto&& a, auto&&... b) {
+        return hal::reverse::find_impl(std::forward<decltype(a)>(a),
+                                       std::forward<decltype(b)>(b)...);
+    });
 
 /* ------------------------- reverse::partial_sum --------------------------- */
 
