@@ -27,9 +27,6 @@ TEST_CASE("tranform", "[HAL]")
         ss.str(std::string{});
         hal::for_each([&ss](auto x) { ss << x; }, e, f, g, h, i);
         CHECK(ss.str() == "hello");
-
-        // r-values
-        hal::transform([](auto x) { return x + 1; }, 1, '2', 3, 4);
     }
     SECTION("partial application")
     {
@@ -70,9 +67,6 @@ TEST_CASE("reverse::tranform", "[HAL]")
         ss.str(std::string{});
         hal::for_each([&ss](auto x) { ss << x; }, e, f, g, h, i);
         CHECK(ss.str() == "hello");
-
-        // r-values
-        hal::reverse::transform([](auto x) { return x + 1; }, 1, '2', 3, 4);
     }
     SECTION("partial application")
     {

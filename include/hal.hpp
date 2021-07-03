@@ -1,5 +1,6 @@
 #ifndef HAL_HPP
 #define HAL_HPP
+#include <concepts>
 #include <cstddef>
 #include <functional>
 #include <tuple>
@@ -13,6 +14,14 @@ namespace hal {
 /* ------------------------------ to_tuple ---------------------------------- */
 
 namespace detail {
+
+template <typename Fn, typename... Args>
+auto return_type_impl()
+    -> decltype(std::declval<Fn>()(std::declval<Args>()...));
+
+/// Is the return type of an object of \p Fn with \p Args... applied to it.
+template <typename Fn, typename... Args>
+using Return_t = decltype(return_type_impl<Fn, Args...>());
 
 template <typename T, typename... Args>
 auto test_is_braces_constructible(int)
@@ -118,10 +127,10 @@ constexpr auto to_tuple_impl(Make_tup&& make_tup, T&& object)
         auto&& [x0] = std::forward<T>(object);
         return make_tup(x0);
     }
-    else {
+    else
         return make_tup();
-    }
 }
+
 }  // namespace detail
 
 template <typename T>
@@ -138,7 +147,9 @@ template <typename T>
 constexpr auto to_ref_tuple(T&& object)
 {
     return detail::to_tuple_impl(
-        [](auto&&... x) { return std::tie(std::forward<decltype(x)>(x)...); },
+        [](auto&&... x) {
+            return std::forward_as_tuple(std::forward<decltype(x)>(x)...);
+        },
         std::forward<T>(object));
 }
 
@@ -165,15 +176,6 @@ constexpr auto from_tuple(Tuple&& t) -> T
 
 /* ---------------------------Function Objects -------------------------------*/
 namespace detail {
-
-/// Function object returning given argument transparently.
-struct Identity {
-    template <typename T>
-    constexpr auto operator()(T&& x) const noexcept -> T&&
-    {
-        return std::forward<T>(x);
-    }
-};
 
 /* ------------------------------- Curried -----------------------------------*/
 // Inspired by Functional Programming in C++ by Ivan Cukic, section 11.3.
@@ -206,14 +208,15 @@ class Curried {
     template <typename... New_args>
     constexpr auto operator()(New_args&&... args) const
     {
-        auto constexpr arg_count =
+        constexpr auto arg_count =
             sizeof...(New_args) + sizeof...(Captured_args);
 
         if constexpr (arg_count >= minimum_args &&
-                      std::is_invocable_v<Function, Captured_args...,
-                                          New_args...>) {
+                      std::invocable<Function, Captured_args..., New_args...>) {
             // If invoking the function, use references of the args...
-            auto all_args = std::tuple_cat(captured_, std::tie(args...));
+            auto all_args = std::tuple_cat(
+                captured_,
+                std::forward_as_tuple(std::forward<New_args>(args)...));
             return std::apply(function_, all_args);
         }
         else {
@@ -239,6 +242,7 @@ constexpr auto make_curried(Function&& f) -> Curried<minimum_args, Function>
 
 /* -------------------------------- for_each -------------------------------- */
 template <typename UnaryOp, typename... Elements>
+    requires((std::invocable<UnaryOp, Elements> && ...))
 constexpr auto for_each_impl(UnaryOp&& func, Elements&&... elements) -> void
 {
     (func(std::forward<Elements>(elements)), ...);
@@ -267,6 +271,9 @@ inline auto constexpr for_each =
 
 /* --------------------------------- reduce --------------------------------- */
 template <typename T, typename BinaryOp, typename... Elements>
+    requires((std::invocable<BinaryOp, T, Elements> && ...) &&
+             (std::convertible_to<detail::Return_t<BinaryOp, T, Elements>, T> &&
+              ...))
 constexpr auto reduce_impl(T init, BinaryOp&& reduce_fn, Elements&&... elements)
     -> T
 {
@@ -352,7 +359,13 @@ inline auto constexpr partial_reduce =
 }  // namespace memberwise
 
 /* ------------------------------- transform -------------------------------- */
+// output of calling the function is assignable to the current element
 template <typename UnaryOp, typename... Elements>
+    requires(
+        (std::invocable<UnaryOp, Elements> && ...) &&
+        (std::assignable_from<Elements, detail::Return_t<UnaryOp, Elements>> &&
+         ...) &&
+        (!std::is_rvalue_reference_v<Elements> && ...))
 constexpr auto transform_impl(UnaryOp&& transform_fn, Elements&&... elements)
     -> void
 {
@@ -368,6 +381,12 @@ inline auto constexpr transform =
 /* --------------------------- transform_reduce ----------------------------- */
 
 template <typename T, typename UnaryOp, typename BinaryOp, typename... Elements>
+    // clang-format off
+    requires(
+        (std::invocable<UnaryOp, Elements> && ...) &&
+        (std::invocable<BinaryOp, T&, detail::Return_t<UnaryOp, Elements>> && ...) &&
+        (std::assignable_from<T&, detail::Return_t<BinaryOp, T&, detail::Return_t<UnaryOp, Elements>>> && ...))
+// clang-format on
 constexpr auto transform_reduce_impl(T init,
                                      UnaryOp&& transform_fn,
                                      BinaryOp&& reduce_fn,
@@ -387,7 +406,15 @@ inline auto constexpr transform_reduce =
 
 /* ------------------------ partial_transform_reduce ------------------------ */
 template <typename T, typename UnaryOp, typename BinaryOp, typename... Elements>
-constexpr void partial_transform_reduce_impl(T init,
+    // clang-format off
+    requires(
+        (std::invocable<UnaryOp, Elements> && ...) &&
+        (std::invocable<BinaryOp, T&, detail::Return_t<UnaryOp, Elements>> && ...) &&
+        (std::assignable_from<T&, detail::Return_t<BinaryOp, T&, detail::Return_t<UnaryOp, Elements>>> && ...) &&
+        (std::assignable_from<Elements, T> && ...) &&
+        (!std::is_rvalue_reference_v<Elements> && ...))
+// clang-format on
+constexpr void partial_transform_reduce_impl([[maybe_unused]] T init,
                                              UnaryOp&& transform_fn,
                                              BinaryOp&& reduce_fn,
                                              Elements&&... elements)
@@ -431,14 +458,7 @@ template <typename UnaryOp, typename... Elements>
 constexpr auto find_if_not_impl(UnaryOp&& predicate, Elements&&... elements)
     -> std::size_t
 {
-    // std::not_fn is not constexpr, can't put this in its own function, not
-    // constexpr, but it's allowed here for some reason.
-    constexpr auto not_fn = [](auto&& f) {
-        return [f = std::forward<decltype(f)>(f)](auto&&... x) {
-            return !f(std::forward<decltype(x)>(x)...);
-        };
-    };
-    return find_if_impl(not_fn(std::forward<UnaryOp>(predicate)),
+    return find_if_impl(std::not_fn(std::forward<UnaryOp>(predicate)),
                         std::forward<Elements>(elements)...);
 }
 
@@ -499,6 +519,7 @@ inline auto constexpr count =
 
 /* --------------------------------- all_of --------------------------------- */
 template <typename UnaryOp, typename... Elements>
+    requires((std::predicate<UnaryOp, Elements> && ...))
 constexpr auto all_of_impl(UnaryOp&& predicate, Elements&&... elements) -> bool
 {
     return (predicate(std::forward<Elements>(elements)) && ...);
@@ -513,11 +534,12 @@ inline auto constexpr all_of =
 template <typename... Elements>
 constexpr auto all(Elements&&... elements) -> bool
 {
-    return all_of_impl(detail::Identity{}, std::forward<Elements>(elements)...);
+    return all_of_impl(std::identity{}, std::forward<Elements>(elements)...);
 }
 
 /* --------------------------------- any_of --------------------------------- */
 template <typename UnaryOp, typename... Elements>
+    requires((std::predicate<UnaryOp, Elements> && ...))
 constexpr auto any_of_impl(UnaryOp&& predicate, Elements&&... elements) -> bool
 {
     return (predicate(std::forward<Elements>(elements)) || ...);
@@ -532,7 +554,7 @@ inline auto constexpr any_of =
 template <typename... Elements>
 constexpr auto any(Elements&&... elements) -> bool
 {
-    return any_of_impl(detail::Identity{}, std::forward<Elements>(elements)...);
+    return any_of_impl(std::identity{}, std::forward<Elements>(elements)...);
 }
 
 /* -------------------------------- none_of --------------------------------- */
@@ -552,8 +574,7 @@ inline auto constexpr none_of =
 template <typename... Elements>
 constexpr auto none(Elements&&... elements) -> bool
 {
-    return none_of_impl(detail::Identity{},
-                        std::forward<Elements>(elements)...);
+    return none_of_impl(std::identity{}, std::forward<Elements>(elements)...);
 }
 
 /* ----------------------- adjacent_transform_reduce ------------------------ */
@@ -788,8 +809,11 @@ constexpr void partial_quotient(Aggregate&& aggregate)
 
 namespace reverse {
 
+// TODO continue from here.
+
 /* --------------------------- reverse::for_each ---------------------------- */
 template <typename UnaryOp, typename... Elements>
+    requires((std::invocable<UnaryOp, Elements> && ...))
 constexpr auto for_each_impl(UnaryOp&& func, Elements&&... elements) -> void
 {
     // clang 11.0.0 warning on unused expression result without void cast.
@@ -843,7 +867,7 @@ inline auto constexpr all_of =
 template <typename... Elements>
 constexpr auto all(Elements&&... elements) -> bool
 {
-    return hal::reverse::all_of_impl(hal::detail::Identity{},
+    return hal::reverse::all_of_impl(std::identity{},
                                      std::forward<Elements>(elements)...);
 }
 
@@ -871,7 +895,7 @@ inline auto constexpr any_of =
 template <typename... Elements>
 constexpr auto any(Elements&&... elements) -> bool
 {
-    return hal::reverse::any_of_impl(hal::detail::Identity{},
+    return hal::reverse::any_of_impl(std::identity{},
                                      std::forward<Elements>(elements)...);
 }
 
@@ -892,7 +916,7 @@ inline auto constexpr none_of =
 template <typename... Elements>
 constexpr auto none(Elements&&... elements) -> bool
 {
-    return hal::reverse::none_of_impl(hal::detail::Identity{},
+    return hal::reverse::none_of_impl(std::identity{},
                                       std::forward<Elements>(elements)...);
 }
 
@@ -997,6 +1021,11 @@ inline auto constexpr partial_reduce =
 /* -------------------------- reverse::transform ---------------------------- */
 
 template <typename UnaryOp, typename... Elements>
+    requires(
+        (std::invocable<UnaryOp, Elements> && ...) &&
+        (std::assignable_from<Elements, detail::Return_t<UnaryOp, Elements>> &&
+         ...) &&
+        (!std::is_rvalue_reference_v<Elements> && ...))
 constexpr auto transform_impl(UnaryOp&& transform_fn, Elements&&... elements)
     -> void
 {
@@ -1007,9 +1036,9 @@ constexpr auto transform_impl(UnaryOp&& transform_fn, Elements&&... elements)
 }
 
 inline auto constexpr transform =
-    hal::detail::make_curried<2>([](auto&& a, auto&&... b) {
-        return hal::reverse::transform_impl(std::forward<decltype(a)>(a),
-                                            std::forward<decltype(b)>(b)...);
+    hal::detail::make_curried<2>([](auto&& op, auto&&... e) {
+        return hal::reverse::transform_impl(std::forward<decltype(op)>(op),
+                                            std::forward<decltype(e)>(e)...);
     });
 
 /* ---------------------- reverse::transform_reduce ------------------------- */
@@ -1111,12 +1140,7 @@ template <typename UnaryOp, typename... Elements>
 constexpr auto find_if_not_impl(UnaryOp&& predicate, Elements&&... elements)
     -> std::size_t
 {
-    constexpr auto not_fn = [](auto&& f) {
-        return [f = std::forward<decltype(f)>(f)](auto&&... x) {
-            return !f(std::forward<decltype(x)>(x)...);
-        };
-    };
-    return reverse::find_if_impl(not_fn(std::forward<UnaryOp>(predicate)),
+    return reverse::find_if_impl(std::not_fn(std::forward<UnaryOp>(predicate)),
                                  std::forward<Elements>(elements)...);
 }
 

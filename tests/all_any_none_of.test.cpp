@@ -71,11 +71,11 @@ TEST_CASE("all_of", "[HAL]")
         CHECK(!hal::all(true, false, true, true, true));
         CHECK(hal::all(true));
         CHECK(hal::all(true, true, true));
-        CHECK(!hal::all(true, nullptr, true));
+        CHECK(!hal::all(true, (int*)nullptr, true));
         CHECK(!hal::reverse::all(true, false, true, true, true));
         CHECK(hal::reverse::all(true));
         CHECK(hal::reverse::all(true, true, true));
-        CHECK(!hal::reverse::all(true, nullptr, true));
+        CHECK(!hal::reverse::all(true, (int*)nullptr, true));
     }
 
     SECTION("constexpr")
@@ -166,22 +166,22 @@ TEST_CASE("any_of", "[HAL]")
         CHECK(!hal::any(false));
         CHECK(hal::any(true));
         CHECK(hal::any(true, true, true));
-        CHECK(!hal::any(false, nullptr, false));
+        CHECK(!hal::any(false, (char*)nullptr, false));
         CHECK(hal::reverse::any(true, false, true, true, true));
         CHECK(!hal::reverse::any(false));
         CHECK(hal::reverse::any(true));
         CHECK(hal::reverse::any(true, true, true));
-        CHECK(!hal::reverse::any(false, nullptr, false));
+        CHECK(!hal::reverse::any(false, (double*)nullptr, false));
     }
 
     SECTION("constexpr")
     {
-        static_assert(hal::any(true, nullptr));
+        static_assert(hal::any(true, (int*)nullptr));
         static_assert(hal::any_of([](auto x) { return x > 42; }, 500, 30.54));
         constexpr auto any_lt_42 = hal::any_of([](auto x) { return x < 42; });
         static_assert(!any_lt_42('a', 4420));
 
-        static_assert(hal::reverse::any(true, nullptr));
+        static_assert(hal::reverse::any(true, (unsigned*)nullptr));
         static_assert(
             hal::reverse::any_of([](auto x) { return x > 42; }, 500, 30.54));
         constexpr auto any_lt_42_rev =
@@ -263,22 +263,22 @@ TEST_CASE("none_of", "[HAL]")
         CHECK(hal::none(false));
         CHECK(!hal::none(true));
         CHECK(!hal::none(true, true, true));
-        CHECK(hal::none(false, nullptr, false));
+        CHECK(hal::none(false, (int*)nullptr, false));
         CHECK(!hal::reverse::none(true, false, true, true, true));
         CHECK(hal::reverse::none(false));
         CHECK(!hal::reverse::none(true));
         CHECK(!hal::reverse::none(true, true, true));
-        CHECK(hal::reverse::none(false, nullptr, false));
+        CHECK(hal::reverse::none(false, (int*)nullptr, false));
     }
 
     SECTION("constexpr")
     {
-        static_assert(hal::none(false, nullptr));
+        static_assert(hal::none(false, (char*)nullptr));
         static_assert(hal::none_of([](auto x) { return x > 42; }, 2, 30.54));
         constexpr auto none_lt_42 = hal::none_of([](auto x) { return x < 42; });
         static_assert(none_lt_42('a', 4420));
 
-        static_assert(hal::reverse::none(false, nullptr));
+        static_assert(hal::reverse::none(false, (bool*)nullptr));
         static_assert(
             hal::reverse::none_of([](auto x) { return x > 42; }, 2, 30.54));
         constexpr auto none_lt_42_rev =

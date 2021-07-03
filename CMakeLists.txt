@@ -11,13 +11,14 @@ target_include_directories(hal
 
 target_compile_features(hal
     INTERFACE
-        cxx_std_17
+        cxx_std_20
 )
 
 target_compile_options(hal
     INTERFACE
         -Wall
         -Wextra
+        -Wpedantic
 )
 
 add_subdirectory(external)

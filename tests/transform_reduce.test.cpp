@@ -1,3 +1,4 @@
+#include <functional>
 #include <sstream>
 
 #include <catch2/catch.hpp>
@@ -26,29 +27,29 @@ TEST_CASE("tranform_reduce", "[HAL]")
         // Apply One
         auto init_tr = hal::transform_reduce(0);
         // ...apply one more
-        auto empty_reduce_0 = init_tr(hal::detail::Identity{});
+        auto empty_reduce_0 = init_tr(std::identity{});
         // ......apply one more
         auto count_twos_0 = empty_reduce_0(inc_if_two);
         CHECK(count_twos_0(1, 4, 2, 2, 5, 2) == 3);
 
         // ...apply two more
-        auto count_twos_1 = init_tr(hal::detail::Identity{}, inc_if_two);
+        auto count_twos_1 = init_tr(std::identity{}, inc_if_two);
         CHECK(count_twos_1(1, 4, 2, 2, 5, 2) == 3);
 
         // ...full application
         auto twos_count_2 =
-            init_tr(hal::detail::Identity{}, inc_if_two, 1, 4, 2, 2, 5, 2);
+            init_tr(std::identity{}, inc_if_two, 1, 4, 2, 2, 5, 2);
         CHECK(twos_count_2 == 3);
 
         // Apply Two
-        auto empty_reduce = hal::transform_reduce(0, hal::detail::Identity{});
+        auto empty_reduce = hal::transform_reduce(0, std::identity{});
         auto count_twos_2 = empty_reduce(inc_if_two);
         CHECK(count_twos_2(1, 4, 2, 2, 5, 2) == 3);
         CHECK(empty_reduce(inc_if_two, 1, 4, 2, 2, 5, 2) == 3);
 
         // Apply Three
         auto count_twos_3 =
-            hal::transform_reduce(0, hal::detail::Identity{}, inc_if_two);
+            hal::transform_reduce(0, std::identity{}, inc_if_two);
         auto twos = count_twos_3(1, 1, 2, 2.0, 4, 2, 'a', 32.1);
         CHECK(twos == 3);
     }
@@ -62,7 +63,7 @@ TEST_CASE("tranform_reduce", "[HAL]")
         // Apply One
         {
             constexpr auto init_tr      = hal::transform_reduce(0);
-            constexpr auto empty_reduce = init_tr(hal::detail::Identity{});
+            constexpr auto empty_reduce = init_tr(std::identity{});
             constexpr auto count_twos   = empty_reduce(inc_if_two);
             static_assert(count_twos(1, 4, 2, 2, 5, 2, 'a') == 3);
             static_assert(count_twos('a') == 0);
@@ -71,7 +72,7 @@ TEST_CASE("tranform_reduce", "[HAL]")
         // Apply Two
         {
             constexpr auto empty_reduce =
-                hal::transform_reduce(0, hal::detail::Identity{});
+                hal::transform_reduce(0, std::identity{});
             constexpr auto count_twos = empty_reduce(inc_if_two);
             static_assert(count_twos(1, 4, 'a', 2, 5, 2) == 2);
         }
@@ -79,7 +80,7 @@ TEST_CASE("tranform_reduce", "[HAL]")
         // Apply Three
         {
             constexpr auto count_twos =
-                hal::transform_reduce(0, hal::detail::Identity{}, inc_if_two);
+                hal::transform_reduce(0, std::identity{}, inc_if_two);
             static_assert(count_twos(1, 1, 2, 2.0, 4, 2, 'a', 32.1) == 3);
         }
     }
@@ -115,29 +116,29 @@ TEST_CASE("reverse::tranform_reduce", "[HAL]")
         // Apply One
         auto init_tr = hr::transform_reduce(0);
         // ...apply one more
-        auto empty_reduce_0 = init_tr(hal::detail::Identity{});
+        auto empty_reduce_0 = init_tr(std::identity{});
         // ......apply one more
         auto count_twos_0 = empty_reduce_0(inc_if_two);
         CHECK(count_twos_0(1, 4, 2, 2, 5, 2) == 3);
 
         // ...apply two more
-        auto count_twos_1 = init_tr(hal::detail::Identity{}, inc_if_two);
+        auto count_twos_1 = init_tr(std::identity{}, inc_if_two);
         CHECK(count_twos_1(1, 4, 2, 2, 5, 2) == 3);
 
         // ...full application
         auto twos_count_2 =
-            init_tr(hal::detail::Identity{}, inc_if_two, 1, 4, 2, 2, 5, 2);
+            init_tr(std::identity{}, inc_if_two, 1, 4, 2, 2, 5, 2);
         CHECK(twos_count_2 == 3);
 
         // Apply Two
-        auto empty_reduce = hr::transform_reduce(0, hal::detail::Identity{});
+        auto empty_reduce = hr::transform_reduce(0, std::identity{});
         auto count_twos_2 = empty_reduce(inc_if_two);
         CHECK(count_twos_2(1, 4, 2, 2, 5, 2) == 3);
         CHECK(empty_reduce(inc_if_two, 1, 4, 2, 2, 5, 2) == 3);
 
         // Apply Three
         auto count_twos_3 =
-            hr::transform_reduce(0, hal::detail::Identity{}, inc_if_two);
+            hr::transform_reduce(0, std::identity{}, inc_if_two);
         auto twos = count_twos_3(1, 1, 2, 2.0, 4, 2, 'a', 32.1);
         CHECK(twos == 3);
     }
@@ -151,7 +152,7 @@ TEST_CASE("reverse::tranform_reduce", "[HAL]")
         // Apply One
         {
             constexpr auto init_tr      = hr::transform_reduce(0);
-            constexpr auto empty_reduce = init_tr(hal::detail::Identity{});
+            constexpr auto empty_reduce = init_tr(std::identity{});
             constexpr auto count_twos   = empty_reduce(inc_if_two);
             static_assert(count_twos(1, 4, 2, 2, 5, 2, 'a') == 3);
             static_assert(count_twos('a') == 0);
@@ -160,7 +161,7 @@ TEST_CASE("reverse::tranform_reduce", "[HAL]")
         // Apply Two
         {
             constexpr auto empty_reduce =
-                hr::transform_reduce(0, hal::detail::Identity{});
+                hr::transform_reduce(0, std::identity{});
             constexpr auto count_twos = empty_reduce(inc_if_two);
             static_assert(count_twos(1, 4, 'a', 2, 5, 2) == 2);
         }
@@ -168,7 +169,7 @@ TEST_CASE("reverse::tranform_reduce", "[HAL]")
         // Apply Three
         {
             constexpr auto count_twos =
-                hr::transform_reduce(0, hal::detail::Identity{}, inc_if_two);
+                hr::transform_reduce(0, std::identity{}, inc_if_two);
             static_assert(count_twos(1, 1, 2, 2.0, 4, 2, 'a', 32.1) == 3);
         }
     }

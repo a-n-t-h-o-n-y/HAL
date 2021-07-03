@@ -9,15 +9,15 @@ TEST_CASE("partial_transform_reduce", "[HAL]")
     SECTION("empty parameter pack")
     {
         [](auto... xs) {
-            hal::partial_transform_reduce(0, hal::detail::Identity{},
-                                          std::plus<>{}, xs...);
+            hal::partial_transform_reduce(0, std::identity{}, std::plus<>{},
+                                          xs...);
         }();
     }
     SECTION("full call")
     {
         [](auto... xs) {
-            hal::partial_transform_reduce(0., hal::detail::Identity{},
-                                          std::plus<>{}, xs...);
+            hal::partial_transform_reduce(0., std::identity{}, std::plus<>{},
+                                          xs...);
             CHECK(hal::get<0>(xs...) == 1);
             CHECK(hal::get<1>(xs...) == 3);
             CHECK(hal::get<2>(xs...) == 6);
@@ -41,7 +41,7 @@ TEST_CASE("partial_transform_reduce", "[HAL]")
     {
         auto init_ptr = hal::partial_transform_reduce(0.);
         [&](auto... xs) {
-            init_ptr(hal::detail::Identity{}, std::plus<>{}, xs...);
+            init_ptr(std::identity{}, std::plus<>{}, xs...);
             CHECK(hal::get<0>(xs...) == 1);
             CHECK(hal::get<1>(xs...) == 3);
             CHECK(hal::get<2>(xs...) == 6);
@@ -79,8 +79,8 @@ TEST_CASE("partial_transform_reduce", "[HAL]")
         SECTION("full call")
         {
             [](auto... xs) {
-                hal::reverse::partial_transform_reduce(
-                    0., hal::detail::Identity{}, std::plus<>{}, xs...);
+                hal::reverse::partial_transform_reduce(0., std::identity{},
+                                                       std::plus<>{}, xs...);
                 CHECK(hal::get<0>(xs...) == 7);
                 CHECK(hal::get<1>(xs...) == 6);
                 CHECK(hal::get<2>(xs...) == 4);
@@ -104,7 +104,7 @@ TEST_CASE("partial_transform_reduce", "[HAL]")
         {
             auto init_ptr = hal::reverse::partial_transform_reduce(0.);
             [&](auto... xs) {
-                init_ptr(hal::detail::Identity{}, std::plus<>{}, xs...);
+                init_ptr(std::identity{}, std::plus<>{}, xs...);
                 CHECK(hal::get<0>(xs...) == 7);
                 CHECK(hal::get<1>(xs...) == 6);
                 CHECK(hal::get<2>(xs...) == 4);
